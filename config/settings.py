@@ -5,12 +5,18 @@ CONCEPT TO LEARN: Django settings from the environment.
 - USE_SQLITE=0: compose Postgres (concurrent writers, JSONB, later pgvector).
 - CELERY_* and KAFKA_* are wired now so Phase 3–4 do not rewrite settings.
 - DEBUG=false refuses the insecure default SECRET_KEY.
+- django-monolith/.env is loaded here (does not override vars already in the shell).
+- `manage.py test` / pytest always use SQLite so CI stays offline.
 """
 
 import os
+import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -91,6 +97,9 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 USE_SQLITE = env_bool("USE_SQLITE", True)
+RUNNING_TESTS = "test" in sys.argv or os.getenv("PYTEST_CURRENT_TEST") is not None
+if RUNNING_TESTS:
+    USE_SQLITE = True
 
 if USE_SQLITE:
     DATABASES = {
@@ -108,7 +117,7 @@ else:
             "USER": os.getenv("POSTGRES_USER", "reconciliation"),
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", "reconciliation"),
             "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "PORT": os.getenv("POSTGRES_PORT", "5433"),
         }
     }
 
