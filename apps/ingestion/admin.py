@@ -4,10 +4,9 @@ from django import forms
 from django.contrib import admin, messages
 from django.shortcuts import redirect, render
 from django.urls import path, reverse
-from pydantic import ValidationError
 
 from apps.ingestion.models import RawRecord
-from apps.ingestion.services import ingest_upload
+from apps.ingestion.tasks import enqueue_ingest_file
 
 
 class IngestUploadForm(forms.Form):
@@ -48,18 +47,15 @@ class RawRecordAdmin(admin.ModelAdmin):
             source_type = form.cleaned_data["source_type"]
             source_id = form.cleaned_data.get("source_id") or Path(uploaded.name).stem
             try:
-                result = ingest_upload(source_type, source_id, uploaded)
+                task = enqueue_ingest_file(source_type, source_id, uploaded)
             except ValueError as exc:
                 form.add_error(None, str(exc))
-            except ValidationError as exc:
-                form.add_error(None, f"Canonical record validation failed: {exc.errors()}")
             else:
                 messages.success(
                     request,
                     (
-                        f"Ingested {result['raw_count']} raw rows and "
-                        f"{result['transaction_count']} transactions "
-                        f"(source_id={result['source_id']})."
+                        f"Ingest queued (task_id={task.id}, source_id={source_id}). "
+                        "Rows appear after the Celery worker finishes."
                     ),
                 )
                 return redirect(reverse("admin:ingestion_rawrecord_changelist"))

@@ -121,11 +121,16 @@ else:
         }
     }
 
-# Phase 3 (Celery) and Phase 4 (Kafka) read these; unused until those workers exist.
+INGEST_UPLOAD_DIR = Path(os.getenv("INGEST_UPLOAD_DIR", BASE_DIR / "uploads"))
+
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
+CELERY_TASK_EAGER_PROPAGATES = True
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+
+if RUNNING_TESTS:
+    CELERY_TASK_ALWAYS_EAGER = True
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [

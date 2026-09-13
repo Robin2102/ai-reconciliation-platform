@@ -1,17 +1,36 @@
 """
-CONCEPT TO LEARN: Celery tasks + why ingestion is async, not inline in a view.
+Celery job: run ingest_source in a worker, not in the HTTP request.
 
-Flow to build together:
-1. A view/endpoint (or a scheduled beat task) triggers `ingest_source.delay(source_type)`
-2. The Celery task gets the right adaptor from the registry, extracts + normalizes
-3. Each normalized record is saved to the RawRecord staging table
-4. The task PRODUCES a Kafka event ("record.ingested") so downstream reconciliation
-   can react without ingestion and reconciliation being tightly coupled.
+Broker (Redis) holds pending messages. The worker pulls one, calls this
+function, then stores the return value on the result backend (also Redis).
+
+A second POST enqueues a second job — duplicate rows unless the client does
+not retry 202, or we add a UniqueConstraint later.
 """
-# from celery import shared_task
-# from apps.adaptors.registry import get_adapter
 
-# @shared_task
-# def ingest_source(source_type: str):
-#     """TODO (together)."""
-#     ...
+from pathlib import Path
+
+from celery import shared_task
+
+from apps.adaptors.registry import get_adapter
+from apps.ingestion.services import ingest_source, persist_upload
+
+
+@shared_task
+def ingest_file_task(source_type: str, source_id: str, file_path: str) -> dict:
+    try:
+        return ingest_source(source_type, source_id, file_path)
+    finally:
+        Path(file_path).unlink(missing_ok=True)
+
+
+def enqueue_ingest_file(source_type: str, source_id: str, uploaded_file):
+    """
+    Validate adapter, save bytes, put JSON-safe args on the broker.
+
+    Unknown source_type fails here (HTTP 400) so we never write a file or
+    enqueue. CSV/parse errors happen in the worker and fail the task.
+    """
+    get_adapter(source_type)
+    path = persist_upload(uploaded_file)
+    return ingest_file_task.delay(source_type, source_id, str(path))

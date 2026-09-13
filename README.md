@@ -26,9 +26,9 @@ CSV / other sources
    unmatched ──► Exception queue ──► RAG + investigator agent ──► human review
 ```
 
-Today the running path stops after ingestion: a CSV becomes `RawRecord` +
-`Transaction` rows. Matching, exceptions, Kafka, and the agent are scaffolded
-but not wired to the API.
+Ingest is asynchronous: HTTP saves the file and enqueues a Celery task;
+`RawRecord` + `Transaction` rows appear when the worker finishes. Matching,
+exceptions, Kafka, and the agent are scaffolded but not wired to the API.
 
 ```
 django-monolith/
@@ -89,15 +89,21 @@ docker compose up -d postgres
 
 Set `USE_SQLITE=0` in `.env`, then `migrate` and `runserver` in this directory.
 
-Redis / Kafka (when you start Celery or producers):
+Redis (required for ingest) from the repo root:
 
 ```bash
-docker compose up -d redis kafka
+docker compose up -d redis
 ```
 
+Two processes — API and worker:
+
 ```bash
+python manage.py runserver
+# other terminal, same venv, django-monolith/
 celery -A config worker --loglevel=info
 ```
+
+Without a worker, Redis queues messages and nothing is ingested.
 
 ## HTTP API
 
@@ -114,9 +120,10 @@ curl -sS -F "file=@./sample.csv" -F "source_type=csv" -F "source_id=hdfc-sep" \
   http://127.0.0.1:8000/api/ingest/
 ```
 
-**201** with `source_type`, `source_id`, `raw_count`, `transaction_count`.
-Unknown `source_type` or an empty/invalid file returns **400**. Ingest runs in
-the request process via `apps.ingestion.services.ingest_source`.
+**202** with `task_id`, `status: queued`, `source_type`, `source_id`. Rows are
+not in the database until the worker runs `ingest_source`. Unknown
+`source_type` or an empty file returns **400** and does not enqueue.
+Admin upload (`/admin/ingestion/rawrecord/upload/`) uses the same queue.
 
 `GET /admin/` — Django admin.  
 `GET /silk/` — request/SQL profiler when `django-silk` is installed and `DEBUG` is true.

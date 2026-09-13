@@ -1,11 +1,11 @@
 """
-CONCEPT TO LEARN: how Celery discovers tasks across Django apps, and the
-difference between the BROKER (Redis, holds pending tasks) and the
-RESULT BACKEND (where task results are stored).
+Celery app for this Django project.
 
-TODO (together): wire this up to config.settings and call app.autodiscover_tasks()
+CELERY_* settings map to Celery config (broker_url, result_backend, …).
+autodiscover_tasks() loads tasks.py in each INSTALLED_APPS package.
 """
 import os
+
 from celery import Celery
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -13,4 +13,3 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 app = Celery("reconciliation")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
-

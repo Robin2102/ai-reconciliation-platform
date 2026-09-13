@@ -26,9 +26,9 @@ class IngestUploadApiTests(TestCase):
             {"file": upload, "source_type": "csv", "source_id": "hdfc-sep"},
             format="multipart",
         )
-        self.assertEqual(response.status_code, 201, response.content)
-        self.assertEqual(response.data["raw_count"], 2)
-        self.assertEqual(response.data["transaction_count"], 2)
+        self.assertEqual(response.status_code, 202, response.content)
+        self.assertEqual(response.data["status"], "queued")
+        self.assertTrue(response.data["task_id"])
         self.assertEqual(response.data["source_id"], "hdfc-sep")
         self.assertEqual(RawRecord.objects.count(), 2)
         self.assertEqual(Transaction.objects.count(), 2)
@@ -43,7 +43,7 @@ class IngestUploadApiTests(TestCase):
             {"file": upload, "source_type": "csv"},
             format="multipart",
         )
-        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.status_code, 202, response.content)
         self.assertEqual(response.data["source_id"], "acme_ledger")
 
     def test_unknown_adapter_returns_400(self):
@@ -82,6 +82,7 @@ class IngestUploadAdminTests(TestCase):
             {"file": upload, "source_type": "csv", "source_id": "hdfc-sep"},
         )
         self.assertEqual(response.status_code, 302)
+        # Tests set CELERY_TASK_ALWAYS_EAGER, so the worker ran in-process.
         self.assertEqual(RawRecord.objects.count(), 2)
         self.assertEqual(Transaction.objects.count(), 2)
 
