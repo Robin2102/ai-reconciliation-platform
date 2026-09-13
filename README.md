@@ -1,16 +1,134 @@
-# Django (DRF) Monolith — AI-Powered Reconciliation Platform
+# Reconciliation platform (Django / DRF)
 
-One deployable Django project. Apps are internal modules, not separate services —
-this mirrors the production pattern you already know (Bancapp), which is exactly
-why we start here: you get to learn the NEW concepts (Kafka, RAG, Agents) without
-also fighting an unfamiliar framework at the same time.
+Django monolith that ingests ledger files, normalizes them to a canonical
+transaction shape, and will match, exception-manage, and investigate mismatches
+in the same codebase. Apps are Python modules in one deployable unit: one
+database, one settings module, web plus optional Celery workers.
 
-## Suggested learning order (do NOT jump ahead — each concept builds on the last)
-1. `apps/adaptors/` — Adapter + Factory pattern (portable data source adaptors)
-2. `apps/ingestion/` — Celery tasks + Kafka producer (raw data -> event stream)
-3. `apps/reconciliation/` — Strategy pattern for matching rules (exact/fuzzy/AI)
-4. `apps/exceptions/` — what happens when reconciliation can't auto-match
-5. `apps/ai_agent/` — RAG (retrieval) then Agents (tool-using investigator)
+Repo-level design (including the FastAPI service split): [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 
-See `/ARCHITECTURE.md` at the repo root for the full system design and the
-monolith-vs-microservice discussion.
+## Architecture
+
+```
+CSV / other sources
+        │
+        ▼
+  Data adaptors                 one CanonicalRecord contract per row
+        │
+        ▼
+  Ingestion                     RawRecord (audit) + Transaction (matchable)
+        │
+        ▼
+  Reconciliation engine         exact / fuzzy / embedding strategies
+        │
+   matched ──► Transaction pair
+        │
+   unmatched ──► Exception queue ──► RAG + investigator agent ──► human review
+```
+
+Today the running path stops after ingestion: a CSV becomes `RawRecord` +
+`Transaction` rows. Matching, exceptions, Kafka, and the agent are scaffolded
+but not wired to the API.
+
+```
+django-monolith/
+├── config/                 Django settings, URLs, Celery app
+├── apps/adaptors/          Source adapters → CanonicalRecord
+├── apps/ingestion/         Staging store + ingest HTTP API
+├── apps/reconciliation/    Canonical Transaction + match engine
+├── apps/exceptions/        Unmatched-item lifecycle
+└── apps/ai_agent/          Retrieval + tool-using investigator
+```
+
+| Layer | Responsibility |
+| --- | --- |
+| Adaptors | Hide source format. `CsvAdapter` is registered as `source_type=csv`. |
+| Ingestion | Persist raw payloads, then validated canonical rows. |
+| Reconciliation | Store `Transaction`; matching strategies live under `engine/`. |
+| Infra | Postgres or SQLite; Redis (Celery); Kafka (events). Compose file is at the repo root. |
+
+Web and workers must use the same database. From the host machine, compose
+services are `localhost`. From another container, use hostnames `postgres`,
+`redis`, `kafka`.
+
+## Configuration
+
+Copy `env.example` to `.env` (gitignored). `config/settings.py` loads `.env`.
+
+| Variable | Purpose |
+| --- | --- |
+| `USE_SQLITE` | `1` (default) = file SQLite. `0` = Postgres from the vars below. |
+| `POSTGRES_*` | DB name, user, password, host, port. Compose publishes Postgres on **5433**. |
+| `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | Redis, default `redis://localhost:6379/0`. |
+| `KAFKA_BOOTSTRAP_SERVERS` | Default `localhost:9092`. |
+| `SECRET_KEY` / `DEBUG` / `ALLOWED_HOSTS` | Django runtime. `DEBUG=false` requires a real `SECRET_KEY`. |
+
+`manage.py test` always uses SQLite, regardless of `USE_SQLITE`.
+
+## Run
+
+```bash
+cd django-monolith
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp env.example .env
+```
+
+SQLite:
+
+```bash
+python manage.py migrate
+python manage.py runserver
+```
+
+Postgres (from repo root):
+
+```bash
+docker compose up -d postgres
+```
+
+Set `USE_SQLITE=0` in `.env`, then `migrate` and `runserver` in this directory.
+
+Redis / Kafka (when you start Celery or producers):
+
+```bash
+docker compose up -d redis kafka
+```
+
+```bash
+celery -A config worker --loglevel=info
+```
+
+## HTTP API
+
+`POST /api/ingest/` — multipart upload.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `file` | yes | CSV bytes |
+| `source_type` | no | Default `csv` |
+| `source_id` | no | Defaults to the filename stem |
+
+```bash
+curl -sS -F "file=@./sample.csv" -F "source_type=csv" -F "source_id=hdfc-sep" \
+  http://127.0.0.1:8000/api/ingest/
+```
+
+**201** with `source_type`, `source_id`, `raw_count`, `transaction_count`.
+Unknown `source_type` or an empty/invalid file returns **400**. Ingest runs in
+the request process via `apps.ingestion.services.ingest_source`.
+
+`GET /admin/` — Django admin.  
+`GET /silk/` — request/SQL profiler when `django-silk` is installed and `DEBUG` is true.
+
+## Data
+
+- **`RawRecord`** — untouched row JSON, `source_type`, `source_id`, ingest status.
+- **`Transaction`** — canonical credit/debit, signed `amount`, currency, timestamp, `external_ref`.
+- In-memory contract is Pydantic `CanonicalRecord` (`apps.adaptors.base`).
+
+## Tests
+
+```bash
+python manage.py test apps.adaptors apps.ingestion
+```
