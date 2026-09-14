@@ -1,0 +1,42 @@
+{% extends "ops/base.html" %}
+
+{% block title %}Exceptions · {{ project.name }}{% endblock %}
+
+{% block content %}
+<p class="steps"><a href="{% url 'ops-recon' %}">Reconciliation</a> → <a href="{% url 'ops-recon-detail' project.pk %}">{{ project.name }}</a> → <b>Exceptions</b></p>
+<h1 class="page-title">Exception queue</h1>
+<p class="lede">Rows that had no match after all rules ran. Phase 6 adds investigate / resolve workflow.</p>
+
+<div class="card" style="padding:0">
+  <div class="scroll" style="max-height:70vh">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Side</th>
+          <th>Reference</th>
+          <th>Amount</th>
+          <th>Date</th>
+          <th>Reason</th>
+          <th>Status</th>
+          <th>Run</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ex in records %}
+        <tr>
+          <td>{{ ex.side }}</td>
+          <td><code>{{ ex.transaction.external_ref }}</code></td>
+          <td>{{ ex.transaction.amount }} {{ ex.transaction.currency }}</td>
+          <td>{{ ex.transaction.timestamp|date:"Y-m-d" }}</td>
+          <td>{{ ex.reason }}</td>
+          <td><span class="badge {{ ex.status }}">{{ ex.status }}</span></td>
+          <td>#{{ ex.run_id }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">No exceptions for this project.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

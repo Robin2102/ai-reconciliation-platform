@@ -1,9 +1,4 @@
-"""
-Poll record.ingested. This is a long-lived process, not a Celery task.
-
-Reconciliation is triggered from `/ops/recon/` (Celery), not from this consumer.
-We only log `record.ingested` here so you can prove the topic works (Kafka UI).
-"""
+"""Poll record.matched — log and hook for async workflows (Phase 5B)."""
 
 from __future__ import annotations
 
@@ -24,19 +19,17 @@ def _stop(*_args) -> None:
     _running = False
 
 
-def handle_record_ingested(payload: dict[str, Any]) -> None:
-    """Hook for Phase 5 (reconciliation). Duplicate events are possible."""
+def handle_record_matched(payload: dict[str, Any]) -> None:
     logger.info(
-        "record.ingested source_id=%s type=%s raw=%s txns=%s ids=%s",
-        payload.get("source_id"),
-        payload.get("source_type"),
-        payload.get("raw_count"),
-        payload.get("transaction_count"),
-        len(payload.get("transaction_ids") or []),
+        "record.matched project_id=%s run_id=%s pairs=%s result_ids=%s",
+        payload.get("project_id"),
+        payload.get("run_id"),
+        payload.get("matched_pairs"),
+        len(payload.get("match_result_ids") or []),
     )
 
 
-def consume_ingestion_events() -> None:
+def consume_matched_events() -> None:
     from confluent_kafka import Consumer, KafkaException
 
     signal.signal(signal.SIGINT, _stop)
@@ -45,12 +38,12 @@ def consume_ingestion_events() -> None:
     consumer = Consumer(
         {
             "bootstrap.servers": settings.KAFKA_BOOTSTRAP_SERVERS,
-            "group.id": "reconciliation-ingestion",
+            "group.id": "reconciliation-matched",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": True,
         }
     )
-    topic = settings.KAFKA_TOPIC_RECORD_INGESTED
+    topic = settings.KAFKA_TOPIC_RECORD_MATCHED
     consumer.subscribe([topic])
     logger.info("Consuming %s at %s", topic, settings.KAFKA_BOOTSTRAP_SERVERS)
 
@@ -62,6 +55,6 @@ def consume_ingestion_events() -> None:
             if msg.error():
                 raise KafkaException(msg.error())
             payload = json.loads(msg.value().decode("utf-8"))
-            handle_record_ingested(payload)
+            handle_record_matched(payload)
     finally:
         consumer.close()

@@ -15,6 +15,7 @@ from apps.ingestion.ingest_results import ingest_result_rows
 from apps.ingestion.studio import mapping_page_context, save_mapping_from_post
 from apps.ingestion.tasks import ingest_file_task
 
+MAPPING_TEMPLATE = "ops/mapping.html"
 
 _SOURCE_TYPE_LABELS = {
     "csv": "CSV — delimited spreadsheet export",
@@ -102,7 +103,7 @@ def mapping_studio(request, file_id: int):
         return redirect("ops-ingest")
 
     if request.method == "GET":
-        return render(request, "ops/mapping.html", mapping_page_context(ingest_file))
+        return render(request, MAPPING_TEMPLATE, mapping_page_context(ingest_file))
 
     action = request.POST.get("action")
     if action not in {"save", "ingest"}:
@@ -126,7 +127,7 @@ def mapping_studio(request, file_id: int):
         highlight = "transaction date" in str(exc).lower()
         return render(
             request,
-            "ops/mapping.html",
+            MAPPING_TEMPLATE,
             mapping_page_context(ingest_file, highlight_transaction_date=highlight),
         )
 
@@ -137,12 +138,12 @@ def mapping_studio(request, file_id: int):
         return redirect("ops-ingest")
     if ingest_file.status == IngestFile.Status.ERROR:
         messages.error(request, ingest_file.error_message)
-        return render(request, "ops/mapping.html", mapping_page_context(ingest_file))
+        return render(request, MAPPING_TEMPLATE, mapping_page_context(ingest_file))
     messages.info(
         request,
         f"Ingest queued for {ingest_file.original_name}. This page updates when the worker finishes.",
     )
-    return render(request, "ops/mapping.html", mapping_page_context(ingest_file))
+    return render(request, MAPPING_TEMPLATE, mapping_page_context(ingest_file))
 
 
 @staff_member_required(login_url="ops-login")

@@ -19,7 +19,17 @@ class HeuristicTabularNormalizer:
 
         external_ref = self._find_key_value(
             norm_keys,
-            ["external_ref", "txn_id", "transaction_id", "ref_no", "reference", "voucher_no", "id", "seq_no"],
+            [
+                "external_ref",
+                "txn_id",
+                "transaction_id",
+                "ref_no",
+                "reference",
+                "ref",
+                "voucher_no",
+                "id",
+                "seq_no",
+            ],
         )
         if not external_ref:
             external_ref = f"REF-{uuid.uuid4().hex[:8].upper()}"

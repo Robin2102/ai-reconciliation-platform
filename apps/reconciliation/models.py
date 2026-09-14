@@ -66,3 +66,13 @@ def save_canonical_records(
         created = Transaction.objects.bulk_create(tx_instances, batch_size=batch_size)
     return created
 
+
+# Reconciliation project models (Phase 5A) — imported for Django migrations.
+from apps.reconciliation.recon_models import (  # noqa: E402,F401
+    MatchResult,
+    MatchRule,
+    ReconLeg,
+    ReconProject,
+    ReconRun,
+)
+

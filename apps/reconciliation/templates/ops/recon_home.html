@@ -1,0 +1,73 @@
+{% extends "ops/base.html" %}
+
+{% block title %}Reconciliation{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Reconciliation</h1>
+<p class="lede">Create a named project from <b>two completed ingests</b>, then run exact 1:1 matching on reference, amount, currency, and date.</p>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">New project</h2>
+  <form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <p class="errornote">{{ form.non_field_errors }}</p>
+    {% endif %}
+    <div class="row">
+      <div style="flex:1 1 200px">
+        <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+        {{ form.name }}
+      </div>
+      <div style="flex:2 1 280px">
+        <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+        {{ form.description }}
+      </div>
+    </div>
+    <div class="row" style="margin-top:.75rem">
+      <div style="flex:1 1 240px">
+        <label for="{{ form.source_ingest.id_for_label }}">{{ form.source_ingest.label }}</label>
+        {{ form.source_ingest }}
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">{{ form.source_ingest.help_text }}</div>
+      </div>
+      <div style="flex:1 1 240px">
+        <label for="{{ form.target_ingest.id_for_label }}">{{ form.target_ingest.label }}</label>
+        {{ form.target_ingest }}
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">{{ form.target_ingest.help_text }}</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" type="submit">Create project</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Projects</h2>
+  {% if projects %}
+  <table class="data">
+    <thead>
+      <tr><th>Name</th><th>Status</th><th>Legs</th><th>Updated</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for p in projects %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td><span class="badge {{ p.status }}">{{ p.status }}</span></td>
+        <td>
+          {% with s=p.source_leg t=p.target_leg %}
+          {% if s and t %}
+          <code>{{ s.feed_key }}</code> → <code>{{ t.feed_key }}</code>
+          {% else %}—{% endif %}
+          {% endwith %}
+        </td>
+        <td>{{ p.updated_at|date:"Y-m-d H:i" }}</td>
+        <td><a href="{% url 'ops-recon-detail' p.pk %}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="lede" style="margin:0">No projects yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

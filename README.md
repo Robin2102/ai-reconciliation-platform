@@ -23,7 +23,7 @@ CSV / other sources
   Ingestion                     RawRecord (audit) + Transaction (matchable)
         │
         ▼
-  Reconciliation engine         exact / fuzzy / embedding strategies
+  Reconciliation engine         MatchRule JSON + condition evaluators (exact / tolerance / fuzzy)
         │
    matched ──► Transaction pair
         │
@@ -33,8 +33,9 @@ CSV / other sources
 Ingest is asynchronous: HTTP API saves the file and enqueues a Celery task;
 `RawRecord` + `Transaction` rows appear when the worker finishes. Operators
 use **`/ops/`** (staff login) to stage a file, map columns, then **Run ingest**.
-`/admin/` is CRUD/inspection only. Matching, exceptions, and the agent are
-not wired yet.
+`/admin/` is CRUD/inspection only. **Reconciliation** lives at `/ops/recon/`
+(projects, rules, runs, match results, exception queue). The investigator agent
+is not wired yet.
 
 ```
 django-monolith/
@@ -50,7 +51,7 @@ django-monolith/
 | --- | --- |
 | Adaptors | Hide source format. `csv` and `txt` adapters share delimited extract (comma/semicolon/tab/pipe). |
 | Ingestion | Persist raw payloads, then validated canonical rows. |
-| Reconciliation | Store `Transaction`; matching strategies live under `engine/`. |
+| Reconciliation | Store `Transaction`; rule runner + conditions under `engine/`. |
 | Infra | Postgres or SQLite; Redis (Celery); Compose Kafka + Kafka UI. |
 
 Web and workers must use the same database. From the host machine, compose
@@ -124,6 +125,7 @@ docker compose up -d kafka kafka-ui
 
 ```bash
 python manage.py consume_ingestion_events
+python manage.py consume_matched_events   # after a recon run publishes record.matched
 ```
 
 Inspect topics at `http://localhost:8080`. The app talks to **one** bootstrap; running Confluent Local at the same time is a second cluster and is ignored unless you change that env var.
@@ -186,6 +188,8 @@ Reload the editor window after changing `pyrightconfig.json` or `.vscode/setting
 
 ## Tests
 
+See **[TESTING.md](./TESTING.md)** for layout (`apps/<app>/tests/`) and how to run a single module.
+
 ```bash
-python manage.py test apps.adaptors apps.ingestion
+python manage.py test
 ```
