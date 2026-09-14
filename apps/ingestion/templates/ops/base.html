@@ -1,0 +1,156 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Ingest{% endblock %} · Reconciliation ops</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #171e27;
+      --panel-2: #1e2733;
+      --line: #2b3644;
+      --text: #e8eef4;
+      --muted: #93a1b1;
+      --accent: #3d9cf0;
+      --accent-2: #2ee59d;
+      --danger: #ff6b7a;
+      --warn: #f5c14a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .nav {
+      background: #0c1116;
+      border-right: 1px solid var(--line);
+      padding: 1.25rem 1rem;
+    }
+    .brand { font-weight: 700; letter-spacing: .02em; margin-bottom: 1.5rem; }
+    .brand span { color: var(--accent-2); }
+    .nav a.item {
+      display: block;
+      color: var(--muted);
+      padding: .5rem .6rem;
+      border-radius: 8px;
+      margin-bottom: .25rem;
+    }
+    .nav a.item:hover, .nav a.item.active {
+      background: var(--panel-2);
+      color: var(--text);
+      text-decoration: none;
+    }
+    .main { padding: 1.5rem 2rem 3rem; max-width: 1280px; }
+    .page-title { font-size: 1.4rem; font-weight: 650; margin: 0 0 .35rem; }
+    .lede { color: var(--muted); margin: 0 0 1.25rem; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.1rem 1.2rem;
+      margin-bottom: 1.1rem;
+    }
+    .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    input[type=text], input[type=file], input[type=password], select {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: .45rem .6rem;
+    }
+    input[type=file] { width: 100%; }
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 8px;
+      padding: .55rem .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #041018;
+    }
+    .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    .btn.ghost { background: transparent; color: var(--muted); }
+    .flash { padding: .7rem .9rem; border-radius: 8px; margin-bottom: 1rem; }
+    .flash-ok { background: #123526; color: #b6f5d8; }
+    .flash-info { background: #13283d; color: #c5e2ff; }
+    .flash-error { background: #3a151c; color: #ffd0d6; }
+    table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.data th, table.data td {
+      text-align: left;
+      padding: .55rem .5rem;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    table.data th { color: var(--muted); font-weight: 600; }
+    .badge {
+      display: inline-block;
+      padding: .15rem .45rem;
+      border-radius: 999px;
+      font-size: 11px;
+      background: var(--panel-2);
+      color: var(--muted);
+    }
+    .badge.staged { color: var(--warn); }
+    .badge.mapped { color: var(--accent); }
+    .badge.ingesting { color: var(--accent); }
+    .badge.done { color: var(--accent-2); }
+    .badge.error { color: var(--danger); }
+    .toolbar { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; margin-bottom: 1rem; }
+    .scroll { overflow: auto; max-height: 420px; }
+    .steps { display: flex; gap: .6rem; color: var(--muted); font-size: 12px; margin-bottom: 1rem; }
+    .steps b { color: var(--text); }
+    .auth input { width: 100%; }
+    .errornote { color: var(--danger); }
+    .user { color: var(--muted); font-size: 12px; margin-top: 2rem; }
+    .actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; }
+    .job-error {
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12.5px;
+      margin: 0;
+    }
+    .file-error { color: var(--danger); font-size: 12px; max-width: 420px; }
+    tr.row-highlight-date td { background: rgba(255, 107, 122, 0.12); outline: 1px solid var(--danger); }
+  </style>
+</head>
+<body>
+{% if request.user.is_authenticated %}
+<div class="shell">
+  <aside class="nav">
+    <div class="brand">Reconcile <span>ops</span></div>
+    <a class="item active" href="{% url 'ops-ingest' %}">Ingest</a>
+    <a class="item" href="/admin/ingestion/rawrecord/">Admin · raw records</a>
+    <a class="item" href="/admin/">Django admin</a>
+    <div class="user">
+      {{ request.user.username }}
+      <form method="post" action="{% url 'ops-logout' %}" style="margin-top:.4rem">
+        {% csrf_token %}
+        <button class="btn ghost" type="submit">Log out</button>
+      </form>
+    </div>
+  </aside>
+  <main class="main">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="flash {% if message.tags == 'error' %}flash-error{% elif message.tags == 'success' %}flash-ok{% else %}flash-info{% endif %}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+  {% block unauth %}{% endblock %}
+{% endif %}
+</body>
+</html>

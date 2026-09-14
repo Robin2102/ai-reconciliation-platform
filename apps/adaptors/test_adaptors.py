@@ -104,6 +104,16 @@ class TestCsvAdapter(TestCase):
         self.assertEqual(records[1].dr_amount, Decimal("3200.00"))
         self.assertEqual(records[1].amount, Decimal("-3200.00"))
 
+    def test_extracts_semicolon_delimited_csv(self):
+        sample_csv = (
+            '"age";"job";"y"\n'
+            '"30";"admin.";"yes"\n'
+        )
+        rows = list(self.adapter.extract(io.StringIO(sample_csv)))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(set(rows[0].keys()), {"age", "job", "y"})
+        self.assertEqual(rows[0]["age"], "30")
+
 
 class TestIngestionAndPersistence(TestCase):
     def test_end_to_end_ingest_and_save(self):

@@ -1,0 +1,168 @@
+{% extends "ops/base.html" %}
+
+{% block title %}Map columns{% endblock %}
+
+{% block content %}
+<p class="steps">1. Upload → <b>2. Map columns</b> → 3. Run ingest</p>
+<h1 class="page-title">Mapping studio</h1>
+<p class="lede">
+  {{ ingest_file.original_name }}
+  · source <code>{{ ingest_file.source_id }}</code>
+  · <span class="badge {{ ingest_file.status }}">{{ ingest_file.status }}</span>
+  · {{ column_rows|length }} columns
+  · {{ sample_matrix|length }} sample rows.
+    Encrypted PII stays in raw_payload and is not used for matching.
+</p>
+<p class="lede">
+  <strong>Money:</strong> credit+debit, or a single amount. Txn type is <em>calculated</em>
+  (signed amount, or a type-like source column such as DrCr) — you do not have to map it.
+  <strong>Transaction date (required):</strong> one Timestamp column, or Day + Month + Year, plus optional Time.
+  <strong>Refs:</strong> map one or more Reference columns; values join with <code>|</code> for matching.
+</p>
+
+{% include "ops/_job_status.html" %}
+
+<form id="mapping-form" method="post">
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="toolbar">
+      <div>
+        <label for="id_template_name">Template name</label>
+        <input id="id_template_name" type="text" name="template_name" value="{{ template.name }}">
+      </div>
+      <div>
+        <label for="id_default_currency">Default currency</label>
+        <input id="id_default_currency" type="text" name="default_currency" value="{{ template.default_currency }}" size="6">
+      </div>
+      <label class="check">
+        <input type="checkbox" name="normalize_headers"{% if template.normalize_headers %} checked{% endif %}>
+        Normalize headers
+      </label>
+    </div>
+    <div id="save-status"></div>
+    <div class="scroll">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Source header</th>
+            <th>Type</th>
+            <th>Role</th>
+            <th>Mapped name</th>
+            <th>Nulls</th>
+            <th>Date format</th>
+            <th>PII</th>
+            <th>Trim</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in column_rows %}
+          <tr{% if row.date_role_highlight %} class="row-highlight-date"{% endif %}>
+            <td><code>{{ row.header }}</code></td>
+            <td>
+              <select name="col-{{ row.index }}-detected_type">
+                {% for value, label in type_choices %}
+                <option value="{{ value }}"{% if row.mapping.detected_type == value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <select name="col-{{ row.index }}-role">
+                {% for value, label in role_choices %}
+                <option value="{{ value }}"{% if row.mapping.role == value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <input type="text" name="col-{{ row.index }}-mapped_name" value="{{ row.mapping.mapped_name }}">
+            </td>
+            <td>
+              <select name="col-{{ row.index }}-null_policy">
+                {% for value, label in null_choices %}
+                <option value="{{ value }}"{% if row.mapping.null_policy == value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <select name="col-{{ row.index }}-date_format">
+                {% for fmt in date_format_choices %}
+                <option value="{{ fmt }}"{% if row.mapping.date_format == fmt %} selected{% endif %}>{% if fmt %}{{ fmt }}{% else %}—{% endif %}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <select name="col-{{ row.index }}-pii">
+                {% for value, label in pii_choices %}
+                <option value="{{ value }}"{% if row.mapping.pii == value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <input type="checkbox" name="col-{{ row.index }}-trim"{% if row.trim %} checked{% endif %}>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="btn" type="submit" name="action" value="ingest">Run ingest</button>
+      <button
+        class="btn secondary"
+        type="submit"
+        name="action"
+        value="save"
+        hx-post="{% url 'ops-mapping' ingest_file.pk %}"
+        hx-target="#save-status"
+        hx-swap="innerHTML"
+      >Save template</button>
+      <a class="btn ghost" href="{% url 'ops-ingest' %}">Back</a>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Application columns (not in the file)</h2>
+  <p class="lede">Written on every row at ingest. Operators cannot map or edit these.</p>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Column</th>
+        <th>When it is set</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for col in generated_columns %}
+      <tr>
+        <td><code>{{ col.name }}</code></td>
+        <td>{{ col.meaning }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Sample rows</h2>
+  <div class="scroll">
+    <table class="data">
+      <thead>
+        <tr>
+          {% for header in profile.headers %}
+          <th>{{ header }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for sample in sample_matrix %}
+        <tr>
+          {% for cell in sample %}
+          <td>{{ cell }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

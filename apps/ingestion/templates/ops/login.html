@@ -1,0 +1,26 @@
+{% extends "ops/base.html" %}
+
+{% block title %}Sign in{% endblock %}
+
+{% block unauth %}
+<div class="auth">
+  <div class="brand" style="margin-bottom: .4rem;">Reconcile <span style="color:#2ee59d">ops</span></div>
+  <p class="lede">Staff sign-in for ingest mapping. Admin stays at /admin/.</p>
+  <form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <p class="errornote">{{ form.non_field_errors }}</p>
+    {% endif %}
+    <p>
+      <label for="id_username">Username</label>
+      {{ form.username }}
+    </p>
+    <p>
+      <label for="id_password">Password</label>
+      {{ form.password }}
+    </p>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn" type="submit">Sign in</button>
+  </form>
+</div>
+{% endblock %}

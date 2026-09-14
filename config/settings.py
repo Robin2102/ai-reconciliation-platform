@@ -39,6 +39,18 @@ if not SECRET_KEY:
             "SECRET_KEY must be set in the environment. Copy env.example to .env."
         )
 
+PII_FERNET_KEY = os.getenv("PII_FERNET_KEY")
+if not PII_FERNET_KEY:
+    if RUNNING_TESTS:
+        from cryptography.fernet import Fernet
+
+        PII_FERNET_KEY = Fernet.generate_key().decode()
+    else:
+        raise ImproperlyConfigured(
+            "PII_FERNET_KEY must be set in the environment. "
+            "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        )
+
 DEBUG = env_bool("DEBUG", True)
 
 ALLOWED_HOSTS = [
@@ -159,3 +171,6 @@ USE_TZ = True
 TIME_ZONE = "UTC"
 
 STATIC_URL = "/static/"
+LOGIN_URL = "ops-login"
+LOGIN_REDIRECT_URL = "ops-ingest"
+LOGOUT_REDIRECT_URL = "ops-login"

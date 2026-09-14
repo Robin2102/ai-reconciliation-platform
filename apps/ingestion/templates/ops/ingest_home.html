@@ -1,0 +1,43 @@
+{% extends "ops/base.html" %}
+
+{% block title %}Ingest{% endblock %}
+
+{% block content %}
+<p class="steps"><b>1. Upload</b> → 2. Map columns → 3. Run ingest</p>
+<h1 class="page-title">Ingest</h1>
+<p class="lede">Stage a CSV, map columns to the canonical record, then queue Celery. Django admin is only for inspecting rows.</p>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Upload file</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <p class="errornote">{{ form.non_field_errors }}</p>
+    {% endif %}
+    <div class="row">
+      <div style="flex:2 1 240px">
+        <label for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+        {{ form.file }}
+        {{ form.file.errors }}
+      </div>
+      <div>
+        <label for="{{ form.source_type.id_for_label }}">{{ form.source_type.label }}</label>
+        {{ form.source_type }}
+      </div>
+      <div style="flex:1 1 160px">
+        <label for="{{ form.source_id.id_for_label }}">{{ form.source_id.label }}</label>
+        {{ form.source_id }}
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">{{ form.source_id.help_text }}</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" type="submit">Stage and map</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Recent files</h2>
+  {% include "ops/_file_list.html" %}
+</div>
+{% endblock %}

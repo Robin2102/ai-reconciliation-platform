@@ -14,6 +14,9 @@ What was built in each phase: [`../PHASES.md`](../PHASES.md).
 CSV / other sources
         │
         ▼
+  Mapping studio (`/ops/`)               template: roles, date format, PII, default CCY
+        │
+        ▼
   Data adaptors                 one CanonicalRecord contract per row
         │
         ▼
@@ -27,9 +30,11 @@ CSV / other sources
    unmatched ──► Exception queue ──► RAG + investigator agent ──► human review
 ```
 
-Ingest is asynchronous: HTTP saves the file and enqueues a Celery task;
-`RawRecord` + `Transaction` rows appear when the worker finishes. Matching,
-exceptions, Kafka, and the agent are scaffolded but not wired to the API.
+Ingest is asynchronous: HTTP API saves the file and enqueues a Celery task;
+`RawRecord` + `Transaction` rows appear when the worker finishes. Operators
+use **`/ops/`** (staff login) to stage a file, map columns, then **Run ingest**.
+`/admin/` is CRUD/inspection only. Matching, exceptions, and the agent are
+not wired yet.
 
 ```
 django-monolith/
@@ -139,17 +144,24 @@ curl -sS -F "file=@./sample.csv" -F "source_type=csv" -F "source_id=hdfc-sep" \
 ```
 
 **202** with `task_id`, `status: queued`, `source_type`, `source_id`. Rows are
-not in the database until the worker runs `ingest_source`. Unknown
-`source_type` or an empty file returns **400** and does not enqueue.
-Admin upload (`/admin/ingestion/rawrecord/upload/`) uses the same queue.
+not in the database until the worker runs `ingest_source` with the CSV adapter
+heuristics (no mapping template). Unknown `source_type` or an empty file
+returns **400** and does not enqueue.
 
-`GET /admin/` — Django admin.  
+Ops UI (`/ops/`) — staff login. Upload stages an `IngestFile`; mapping studio
+profiles columns. Save a template, then **Run ingest** (Celery + Kafka after
+commit). Set `PII_FERNET_KEY` in `.env` (see `env.example`).
+
+`GET /admin/` — Django admin (inspect RawRecord / Transaction / templates).  
 `GET /silk/` — request/SQL profiler when `django-silk` is installed and `DEBUG` is true.
 
 ## Data
 
-- **`RawRecord`** — untouched row JSON, `source_type`, `source_id`, ingest status.
-- **`Transaction`** — canonical credit/debit, signed `amount`, currency, timestamp, `external_ref`.
+- **`IngestFile`** — staged upload before mapping/ingest.
+- **`MappingTemplate` / `ColumnMapping`** — reusable column roles for a `source_id`.
+- **`RawRecord`** — row JSON (PII columns encrypted when tagged), `source_type`, `source_id`, ingest status.
+- **`Transaction`** — canonical credit/debit, signed `amount`, currency, `timestamp` (transaction datetime), `external_ref` (reference / match key from mapped **Reference** columns).
+- Each row’s `raw_payload._generated` includes `transaction_date` (date-only copy of the mapped transaction date), `uploaded_date`, `txn_type`, and `reconciled_date` / `reconciled_by` (null until matching or exception closure).
 - In-memory contract is Pydantic `CanonicalRecord` (`apps.adaptors.base`).
 
 ## Tests
