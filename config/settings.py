@@ -94,7 +94,9 @@ if DEBUG:
     if silk is not None:
         INSTALLED_APPS.append("silk")
         MIDDLEWARE.insert(1, "silk.middleware.SilkyMiddleware")
-        SILKY_PYTHON_PROFILER = True
+        # cProfile uses sys.monitoring tool 2. On Python 3.12+ that slot is
+        # often already taken (autoreload), which raises "tool 2 is already in use".
+        SILKY_PYTHON_PROFILER = False
         SILKY_META = True
 
 ROOT_URLCONF = "config.urls"
