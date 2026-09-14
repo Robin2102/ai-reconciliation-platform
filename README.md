@@ -6,6 +6,7 @@ in the same codebase. Apps are Python modules in one deployable unit: one
 database, one settings module, web plus optional Celery workers.
 
 Repo-level design (including the FastAPI service split): [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
+What was built in each phase: [`../PHASES.md`](../PHASES.md).
 
 ## Architecture
 
@@ -45,7 +46,7 @@ django-monolith/
 | Adaptors | Hide source format. `CsvAdapter` is registered as `source_type=csv`. |
 | Ingestion | Persist raw payloads, then validated canonical rows. |
 | Reconciliation | Store `Transaction`; matching strategies live under `engine/`. |
-| Infra | Postgres or SQLite; Redis (Celery); Kafka (events). Compose file is at the repo root. |
+| Infra | Postgres or SQLite; Redis (Celery); Compose Kafka + Kafka UI. |
 
 Web and workers must use the same database. From the host machine, compose
 services are `localhost`. From another container, use hostnames `postgres`,
@@ -60,8 +61,8 @@ Copy `env.example` to `.env` (gitignored). `config/settings.py` loads `.env`.
 | `USE_SQLITE` | `1` (default) = file SQLite. `0` = Postgres from the vars below. |
 | `POSTGRES_*` | DB name, user, password, host, port. Compose publishes Postgres on **5433**. |
 | `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | Redis, default `redis://localhost:6379/0`. |
-| `KAFKA_BOOTSTRAP_SERVERS` | Default `localhost:9092`. |
-| `SECRET_KEY` / `DEBUG` / `ALLOWED_HOSTS` | Django runtime. `DEBUG=false` requires a real `SECRET_KEY`. |
+| `KAFKA_BOOTSTRAP_SERVERS` | Compose Kafka, `127.0.0.1:9092`. |
+| `SECRET_KEY` / `DEBUG` / `ALLOWED_HOSTS` | Required in `.env`. Never commit `SECRET_KEY`. |
 
 `manage.py test` always uses SQLite, regardless of `USE_SQLITE`.
 
@@ -104,6 +105,23 @@ celery -A config worker --loglevel=info
 ```
 
 Without a worker, Redis queues messages and nothing is ingested.
+
+Kafka (Compose, same topology you would ship: broker + UI):
+
+```bash
+# stop Confluent Local if it is still running, so you only have one cluster
+confluent local kafka stop
+
+docker compose up -d kafka kafka-ui
+```
+
+`.env` must be `KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092`. Restart the Celery worker. Then:
+
+```bash
+python manage.py consume_ingestion_events
+```
+
+Inspect topics at `http://localhost:8080`. The app talks to **one** bootstrap; running Confluent Local at the same time is a second cluster and is ignored unless you change that env var.
 
 ## HTTP API
 

@@ -4,7 +4,7 @@ CONCEPT TO LEARN: Django settings from the environment.
 - USE_SQLITE=1 (default): local tests and offline work.
 - USE_SQLITE=0: compose Postgres (concurrent writers, JSONB, later pgvector).
 - CELERY_* and KAFKA_* are wired now so Phase 3–4 do not rewrite settings.
-- DEBUG=false refuses the insecure default SECRET_KEY.
+- SECRET_KEY must come from the environment (no default in source).
 - django-monolith/.env is loaded here (does not override vars already in the shell).
 - `manage.py test` / pytest always use SQLite so CI stays offline.
 """
@@ -13,6 +13,8 @@ import os
 import sys
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,11 +28,18 @@ def env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-learning-key-recon-platform-2026")
-DEBUG = env_bool("DEBUG", True)
+RUNNING_TESTS = "test" in sys.argv or os.getenv("PYTEST_CURRENT_TEST") is not None
 
-if not DEBUG and SECRET_KEY.startswith("django-insecure-"):
-    raise RuntimeError("Set SECRET_KEY when DEBUG is false.")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if RUNNING_TESTS:
+        SECRET_KEY = get_random_secret_key()
+    else:
+        raise ImproperlyConfigured(
+            "SECRET_KEY must be set in the environment. Copy env.example to .env."
+        )
+
+DEBUG = env_bool("DEBUG", True)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -97,7 +106,6 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 USE_SQLITE = env_bool("USE_SQLITE", True)
-RUNNING_TESTS = "test" in sys.argv or os.getenv("PYTEST_CURRENT_TEST") is not None
 if RUNNING_TESTS:
     USE_SQLITE = True
 
@@ -127,10 +135,13 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
 CELERY_TASK_EAGER_PROPAGATES = True
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092")
+KAFKA_TOPIC_RECORD_INGESTED = os.getenv("KAFKA_TOPIC_RECORD_INGESTED", "record.ingested")
+KAFKA_ENABLED = env_bool("KAFKA_ENABLED", True)
 
 if RUNNING_TESTS:
     CELERY_TASK_ALWAYS_EAGER = True
+    KAFKA_ENABLED = False
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [

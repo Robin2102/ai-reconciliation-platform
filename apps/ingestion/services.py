@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db import transaction
 
 from apps.adaptors.registry import get_adapter
+from apps.ingestion.kafka_producer import publish_record_ingested
 from apps.ingestion.models import RawRecord
 from apps.reconciliation.models import save_canonical_records
 
@@ -79,9 +80,13 @@ def ingest_source(
         created_raw = RawRecord.objects.bulk_create(raw_instances, batch_size=1000)
         created_tx = save_canonical_records(canonical_records)
 
-    return {
+    result = {
         "source_type": source_type.lower(),
         "source_id": source_id,
         "raw_count": len(created_raw),
         "transaction_count": len(created_tx),
+        "transaction_ids": [tx.pk for tx in created_tx if tx.pk is not None],
     }
+    # After commit: a failed publish must not roll back rows.
+    publish_record_ingested(result)
+    return result

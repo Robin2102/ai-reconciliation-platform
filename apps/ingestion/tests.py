@@ -1,10 +1,14 @@
+from unittest.mock import patch
+import io
+
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.ingestion.models import RawRecord
+from apps.ingestion.services import ingest_source
 from apps.reconciliation.models import Transaction
 
 
@@ -95,3 +99,17 @@ class IngestUploadAdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "sap")
         self.assertEqual(RawRecord.objects.count(), 0)
+
+
+class KafkaPublishTests(TestCase):
+    @override_settings(KAFKA_ENABLED=True)
+    @patch("apps.ingestion.services.publish_record_ingested")
+    def test_ingest_source_publishes_after_commit(self, publish):
+        ingest_source("csv", "hdfc-sep", io.BytesIO(CSV_BODY.encode("utf-8")))
+        publish.assert_called_once()
+        payload = publish.call_args[0][0]
+        self.assertEqual(payload["source_id"], "hdfc-sep")
+        self.assertEqual(payload["source_type"], "csv")
+        self.assertEqual(payload["transaction_count"], 2)
+        self.assertEqual(len(payload["transaction_ids"]), 2)
+        self.assertEqual(Transaction.objects.count(), 2)
