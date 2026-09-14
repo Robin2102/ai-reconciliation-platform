@@ -18,7 +18,7 @@ from apps.ingestion.tasks import ingest_file_task
 
 _SOURCE_TYPE_LABELS = {
     "csv": "CSV — delimited spreadsheet export",
-    "txt": "TXT — delimited text (same parser as CSV)",
+    "txt": "TXT — delimited text",
     "xlsx": "Excel (.xlsx)",
     "pdf": "PDF — table extract (text-based PDFs)",
 }
