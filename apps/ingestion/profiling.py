@@ -10,6 +10,7 @@ from typing import Any
 
 from apps.adaptors.delimited import csv_dict_reader, open_delimited_text
 from apps.adaptors.excel_io import extract_excel_rows
+from apps.adaptors.pdf_io import extract_pdf_rows
 
 SAMPLE_ROWS = 50
 
@@ -168,12 +169,26 @@ def profile_excel_file(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict
     return _profile_from_row_dicts(headers, rows)
 
 
+def profile_pdf_file(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
+    headers: list[str] = []
+    rows: list[dict[str, str]] = []
+    for i, row in enumerate(extract_pdf_rows(path)):
+        if not headers:
+            headers = list(row.keys())
+        if i >= sample_rows:
+            break
+        rows.append({h: str(row.get(h) or "") for h in headers})
+    return _profile_from_row_dicts(headers, rows)
+
+
 def profile_staged_file(path: str | Path, source_type: str, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
     from apps.ingestion.services import profiler_source_type
 
     kind = profiler_source_type(path, source_type)
     if kind == "xlsx":
         return profile_excel_file(path, sample_rows=sample_rows)
+    if kind == "pdf":
+        return profile_pdf_file(path, sample_rows=sample_rows)
     return profile_delimited_file(path, sample_rows=sample_rows)
 
 

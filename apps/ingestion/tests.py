@@ -32,6 +32,9 @@ class InferSourceTypeTests(TestCase):
     def test_xlsx_extension_defaults_to_xlsx(self):
         self.assertEqual(infer_source_type("report.xlsx", "csv"), "xlsx")
 
+    def test_pdf_extension_defaults_to_pdf(self):
+        self.assertEqual(infer_source_type("stmt.pdf", "csv"), "pdf")
+
 
 class IngestUploadApiTests(TestCase):
     def setUp(self):

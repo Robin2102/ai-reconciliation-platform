@@ -11,3 +11,4 @@ class AdaptorsConfig(AppConfig):
         from . import csv_adapter  # noqa: F401
         from . import txt_adapter  # noqa: F401
         from . import excel_adapter  # noqa: F401
+        from . import pdf_adapter  # noqa: F401

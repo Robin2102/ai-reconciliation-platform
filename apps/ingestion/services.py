@@ -25,6 +25,14 @@ SourceInput = Union[str, Path, bytes, BinaryIO]
 
 _TXT_EXTENSIONS = {".txt", ".text"}
 _XLSX_EXTENSIONS = {".xlsx", ".xlsm"}
+_PDF_EXTENSIONS = {".pdf"}
+
+
+def _file_is_pdf(path: Path) -> bool:
+    try:
+        return path.read_bytes()[:5] == b"%PDF-"
+    except OSError:
+        return False
 
 
 def _file_starts_with_zip(path: Path) -> bool:
@@ -34,9 +42,9 @@ def _file_starts_with_zip(path: Path) -> bool:
         return False
 
 NO_DATA_ROWS_MESSAGE = (
-    "No data rows found in the file. Add at least one row below the header, use a delimited "
-    "text format (comma, semicolon, tab, or pipe), and save as UTF-8. Fixed-width .txt is not "
-    "supported yet."
+    "No data rows found in the file. Delimited files need a header row plus data rows; "
+    "Excel needs a sheet table; PDF needs extractable tables (not scanned images). "
+    "Fixed-width .txt is not supported yet."
 )
 
 
@@ -54,13 +62,17 @@ def infer_source_type(filename: str, source_type: str | None = None) -> str:
         return "txt"
     if ext in _XLSX_EXTENSIONS:
         return "xlsx"
+    if ext in _PDF_EXTENSIONS:
+        return "pdf"
     return "csv"
 
 
 def profiler_source_type(path: str | Path, source_type: str) -> str:
-    """Pick profiler/extract path (handles .xlsx staged as csv)."""
+    """Pick profiler/extract path (handles mis-typed staged files)."""
     p = Path(path)
     ext = p.suffix.lower()
+    if ext in _PDF_EXTENSIONS or _file_is_pdf(p):
+        return "pdf"
     if ext in _XLSX_EXTENSIONS or _file_starts_with_zip(p):
         return "xlsx"
     return source_type.lower()
@@ -117,7 +129,7 @@ def ingest_source(
     Extract raw rows, persist them for audit, normalize, persist Transactions.
 
     With a MappingTemplate, rows become CanonicalRecord via apply_column_mapping.
-    Without one, CsvAdapter.normalize keeps the heuristic/legacy path.
+    Without one, adapter.normalize uses HeuristicTabularNormalizer (legacy API path).
     """
     if isinstance(source_input, (str, Path)):
         source_type = profiler_source_type(source_input, source_type)

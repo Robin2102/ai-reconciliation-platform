@@ -11,6 +11,7 @@ cryptography>=43.0         # Fernet for PII columns at rest
 django-silk>=5.4           # request/SQL profiler UI (dev only)
 locust>=2.40
 openpyxl>=3.1.5
+pdfplumber>=0.11.0
                # load-testing client (run separately from Django)
 # --- AI layer (add when you reach apps/ai_agent) ---
 # openai / anthropic        # LLM client

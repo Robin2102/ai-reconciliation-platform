@@ -20,6 +20,7 @@ _SOURCE_TYPE_LABELS = {
     "csv": "CSV — delimited spreadsheet export",
     "txt": "TXT — delimited text (same parser as CSV)",
     "xlsx": "Excel (.xlsx)",
+    "pdf": "PDF — table extract (text-based PDFs)",
 }
 
 
@@ -31,7 +32,7 @@ def source_type_choices():
 
 
 class IngestUploadForm(forms.Form):
-    file = forms.FileField(label="CSV, TXT, or XLSX file")
+    file = forms.FileField(label="CSV, TXT, XLSX, or PDF file")
     source_type = forms.ChoiceField(
         choices=(),
         initial="csv",

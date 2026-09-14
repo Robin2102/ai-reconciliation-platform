@@ -1,6 +1,8 @@
 from decimal import Decimal
 import io
 from datetime import datetime, timezone
+from unittest.mock import patch
+
 from django.test import TestCase
 
 
@@ -8,6 +10,8 @@ from apps.adaptors.base import CanonicalRecord, DataSourceAdapter
 from apps.adaptors.csv_adapter import CsvAdapter
 from apps.adaptors.txt_adapter import TxtAdapter
 from apps.adaptors.excel_adapter import ExcelAdapter
+from apps.adaptors.pdf_adapter import PdfAdapter
+from apps.adaptors.heuristic_normalize import HeuristicTabularNormalizer
 from openpyxl import Workbook
 from apps.adaptors.registry import get_adapter, register_adapter, list_registered_adapters
 from apps.ingestion.models import RawRecord
@@ -66,10 +70,28 @@ class TestAdapterRegistry(TestCase):
         self.assertEqual(adapter_cls, ExcelAdapter)
         self.assertIn("xlsx", list_registered_adapters())
 
+    def test_pdf_adapter_registered(self):
+        adapter_cls = get_adapter("pdf")
+        self.assertEqual(adapter_cls, PdfAdapter)
+        self.assertIn("pdf", list_registered_adapters())
+
     def test_unregistered_adapter_raises_value_error(self):
         with self.assertRaises(ValueError) as ctx:
             get_adapter("non_existent_adapter")
         self.assertIn("No adapter registered for source type 'non_existent_adapter'", str(ctx.exception))
+
+
+class TestHeuristicNormalizer(TestCase):
+    def setUp(self):
+        self.normalizer = HeuristicTabularNormalizer()
+
+    def test_normalizes_amount_and_ref(self):
+        rec = self.normalizer.normalize(
+            {"txn_id": "A1", "amount": "250.00", "type": "CR", "date": "2026-01-01"},
+            "feed",
+        )
+        self.assertEqual(rec.external_ref, "A1")
+        self.assertEqual(rec.cr_amount, Decimal("250.00"))
 
 
 class TestCsvAdapter(TestCase):
@@ -145,6 +167,18 @@ class TestExcelAdapter(TestCase):
         self.assertEqual(rows[0]["txn_id"], "T1")
         self.assertEqual(rows[0]["F_TRANDATE"], "20260508")
         self.assertEqual(rows[0]["amount"], "100.5")
+
+
+class TestPdfAdapter(TestCase):
+    def setUp(self):
+        self.adapter = PdfAdapter()
+
+    @patch("apps.adaptors.pdf_adapter.extract_pdf_rows")
+    def test_extract_yields_rows_from_pdf_io(self, extract_mock):
+        extract_mock.return_value = iter([{"txn_id": "T1", "amount": "42.00"}])
+        rows = list(self.adapter.extract(b"%PDF-fake"))
+        self.assertEqual(rows[0]["txn_id"], "T1")
+        extract_mock.assert_called_once()
 
 
 class TestTxtAdapter(TestCase):

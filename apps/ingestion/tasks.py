@@ -64,7 +64,7 @@ def enqueue_ingest_file(source_type: str, source_id: str, uploaded_file, templat
     """
     Validate adapter, stage bytes as IngestFile, put JSON-safe ids on the broker.
 
-    API / tests call this without a template (heuristic CsvAdapter.normalize).
+    API / tests call this without a template (heuristic tabular normalize).
     Mapping studio passes template_id after the operator maps columns.
     """
     get_adapter(source_type)
