@@ -29,6 +29,9 @@ class InferSourceTypeTests(TestCase):
     def test_explicit_txt_respected(self):
         self.assertEqual(infer_source_type("data.csv", "txt"), "txt")
 
+    def test_xlsx_extension_defaults_to_xlsx(self):
+        self.assertEqual(infer_source_type("report.xlsx", "csv"), "xlsx")
+
 
 class IngestUploadApiTests(TestCase):
     def setUp(self):
@@ -203,6 +206,44 @@ class IngestOpsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CSV — delimited")
         self.assertContains(response, "TXT — delimited")
+
+    def test_done_ingest_shows_normalized_rows_page(self):
+        upload = SimpleUploadedFile("bank_sep.csv", CSV_BODY.encode("utf-8"), content_type="text/csv")
+        self.client.post(
+            self.upload_url,
+            {"file": upload, "source_type": "csv", "source_id": "rows-view"},
+        )
+        ingest_file = IngestFile.objects.get(source_id="rows-view")
+        mapping_url = reverse("ops-mapping", kwargs={"file_id": ingest_file.pk})
+        self.client.get(mapping_url)
+        from apps.ingestion.models import MappingTemplate
+
+        template = MappingTemplate.objects.get(source_id="rows-view")
+        data = {
+            "action": "ingest",
+            "template_name": template.name,
+            "default_currency": "INR",
+            "normalize_headers": "on",
+        }
+        for i, col in enumerate(template.columns.all()):
+            data[f"col-{i}-detected_type"] = col.detected_type
+            data[f"col-{i}-role"] = col.role
+            data[f"col-{i}-mapped_name"] = col.mapped_name
+            data[f"col-{i}-null_policy"] = col.null_policy
+            data[f"col-{i}-date_format"] = col.date_format
+            data[f"col-{i}-pii"] = col.pii
+            if (col.extra or {}).get("trim", True):
+                data[f"col-{i}-trim"] = "on"
+        self.client.post(mapping_url, data)
+        ingest_file.refresh_from_db()
+        self.assertEqual(ingest_file.status, IngestFile.Status.DONE)
+        results_url = reverse("ops-ingest-results", kwargs={"file_id": ingest_file.pk})
+        response = self.client.get(results_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "TXN-101")
+        self.assertContains(response, "Normalized transactions")
+        home = self.client.get(self.upload_url)
+        self.assertContains(home, "View rows")
 
 
 class KafkaPublishTests(TestCase):

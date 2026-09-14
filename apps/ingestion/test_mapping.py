@@ -1,12 +1,14 @@
+import io
 import tempfile
 from pathlib import Path
 
 from django.test import TestCase, override_settings
+from openpyxl import Workbook
 
 from apps.ingestion.mapping import apply_column_mapping, validate_template
 from apps.ingestion.models import ColumnMapping, MappingTemplate
 from apps.ingestion.pii import encrypt_pii
-from apps.ingestion.profiling import profile_csv
+from apps.ingestion.profiling import profile_csv, profile_staged_file
 from apps.ingestion.services import ingest_source
 
 BANK_CSV = (
@@ -24,6 +26,23 @@ def _write_csv(body: str) -> Path:
 
 
 class ProfilingTests(TestCase):
+    def test_profile_staged_file_reads_xlsx(self):
+        wb = Workbook()
+        ws = wb.active
+        assert ws is not None
+        ws.append(["txn_id", "amount"])
+        ws.append(["T1", 10])
+        buf = io.BytesIO()
+        wb.save(buf)
+        path = Path(tempfile.mkstemp(suffix=".xlsx")[1])
+        path.write_bytes(buf.getvalue())
+        try:
+            profile = profile_staged_file(path, "csv")
+            self.assertEqual(profile["headers"], ["txn_id", "amount"])
+            self.assertEqual(len(profile["sample_rows"]), 1)
+        finally:
+            path.unlink(missing_ok=True)
+
     def test_profiles_screenshot_style_headers(self):
         path = _write_csv(BANK_CSV)
         try:

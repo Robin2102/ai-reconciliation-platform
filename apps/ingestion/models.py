@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 from django.db import models
+
+if TYPE_CHECKING:
+    from django.db.models.manager import Manager
 
 
 class RawRecord(models.Model):
@@ -11,6 +16,13 @@ class RawRecord(models.Model):
     raw_payload = models.JSONField(help_text="Untouched raw payload dictionary")
     ingested_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, default="PENDING", help_text="Processing status (PENDING, NORMALIZED, ERROR)")
+    ingest_file = models.ForeignKey(
+        "IngestFile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="raw_records",
+    )
 
     class Meta:
         ordering = ["-ingested_at"]
@@ -53,6 +65,9 @@ class MappingTemplate(models.Model):
     dedupe = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    if TYPE_CHECKING:
+        columns: Manager["ColumnMapping"]
 
     class Meta:
         ordering = ["-updated_at"]

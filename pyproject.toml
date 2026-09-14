@@ -1,0 +1,56 @@
+# Type checking: Pyright/basedpyright (IDE) + mypy + django-stubs plugin (Django ORM inference).
+# Pyright has no django plugin; mypy fills that gap in CI. See README "Type checking".
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+
+[tool.basedpyright]
+include = ["apps", "config"]
+exclude = [
+    "**/__pycache__",
+    "**/.venv",
+    "**/migrations",
+]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+extraPaths = ["."]
+reportMissingImports = "warning"
+reportMissingModuleSource = "none"
+# django-stubs + Django metaclass: common false positives without the mypy plugin
+reportAttributeAccessIssue = "none"
+reportIncompatibleVariableOverride = "none"
+reportIncompatibleMethodOverride = "none"
+reportCallIssue = "none"
+reportFunctionMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportIndexIssue = "none"
+reportInvalidTypeArguments = "none"
+reportArgumentType = "warning"
+reportReturnType = "warning"
+
+[tool.pyright]
+# Pylance / legacy pyright reads this if basedpyright section is ignored
+include = ["apps", "config"]
+exclude = ["**/__pycache__", "**/.venv", "**/migrations"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+extraPaths = ["."]
+reportMissingImports = "warning"
+reportMissingModuleSource = "none"
+reportAttributeAccessIssue = "none"
+reportIncompatibleVariableOverride = "none"
+reportIncompatibleMethodOverride = "none"
+reportCallIssue = "none"
+reportFunctionMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportIndexIssue = "none"
+reportInvalidTypeArguments = "none"
+reportArgumentType = "warning"
+reportReturnType = "warning"

@@ -1,7 +1,7 @@
 """Shared mapping-studio helpers used by the ops UI (not Django admin)."""
 
 from apps.ingestion.models import ColumnMapping, IngestFile, MappingTemplate
-from apps.ingestion.profiling import profile_csv
+from apps.ingestion.profiling import profile_staged_file
 
 DATE_FORMAT_CHOICES = [
     "",
@@ -115,7 +115,7 @@ def save_mapping_from_post(request, template: MappingTemplate, headers: list[str
 
 
 def mapping_page_context(ingest_file: IngestFile, highlight_transaction_date: bool = False) -> dict:
-    profile = profile_csv(ingest_file.path)
+    profile = profile_staged_file(ingest_file.path, ingest_file.source_type)
     template = seed_or_load_template(ingest_file, profile)
     columns = list(template.columns.all())
     col_by_header = {c.source_header: c for c in columns}

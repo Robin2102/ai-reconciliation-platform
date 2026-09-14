@@ -30,7 +30,9 @@
         <td><span class="badge {{ f.status }}">{{ f.status }}</span></td>
         <td>{{ f.created_at|date:"Y-m-d H:i" }}</td>
         <td>
-          {% if f.status == "staged" or f.status == "mapped" or f.status == "error" %}
+          {% if f.status == "done" %}
+          <a href="{% url 'ops-ingest-results' f.pk %}">View rows</a>
+          {% elif f.status == "staged" or f.status == "mapped" or f.status == "error" %}
           <a href="{% url 'ops-mapping' f.pk %}">Open mapping</a>
           {% endif %}
         </td>

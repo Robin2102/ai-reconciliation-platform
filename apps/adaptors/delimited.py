@@ -9,8 +9,23 @@ from typing import Any, Iterable, TextIO, Union
 
 _SNIFF_DELIMITERS = ",;\t|"
 _SNIFF_BYTES = 8192
+_TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp1252", "latin-1")
 
 SourceInput = Union[str, Path, TextIO, bytes, io.StringIO]
+
+
+def decode_text_bytes(data: bytes) -> str:
+    """Decode bank CSV/TXT exports (UTF-8, Windows-1252, Latin-1)."""
+    for encoding in _TEXT_ENCODINGS:
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
+def open_delimited_text(path: str | Path) -> TextIO:
+    return io.StringIO(decode_text_bytes(Path(path).read_bytes()))
 
 
 def csv_dict_reader(text_stream: TextIO) -> csv.DictReader:
@@ -36,21 +51,19 @@ def csv_dict_reader(text_stream: TextIO) -> csv.DictReader:
 def extract_delimited_rows(source_input: SourceInput) -> Iterable[dict[str, Any]]:
     """Yield header-keyed rows from a delimited text file or stream."""
     if isinstance(source_input, (str, Path)):
-        with open(source_input, mode="r", encoding="utf-8-sig", newline="") as handle:
-            reader = csv_dict_reader(handle)
-            for row in reader:
-                yield dict(row)
+        reader = csv_dict_reader(open_delimited_text(source_input))
+        for row in reader:
+            yield dict(row)
         return
     if isinstance(source_input, bytes):
-        text = source_input.decode("utf-8-sig")
-        reader = csv_dict_reader(io.StringIO(text))
+        reader = csv_dict_reader(io.StringIO(decode_text_bytes(source_input)))
         for row in reader:
             yield dict(row)
         return
     if hasattr(source_input, "read"):
         content = source_input.read()
         if isinstance(content, bytes):
-            content = content.decode("utf-8-sig")
+            content = decode_text_bytes(content)
         reader = csv_dict_reader(io.StringIO(content))
         for row in reader:
             yield dict(row)

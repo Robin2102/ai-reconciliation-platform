@@ -164,6 +164,26 @@ commit). Set `PII_FERNET_KEY` in `.env` (see `env.example`).
 - Each row’s `raw_payload._generated` includes `transaction_date` (date-only copy of the mapped transaction date), `uploaded_date`, `txn_type`, and `reconciled_date` / `reconciled_by` (null until matching or exception closure).
 - In-memory contract is Pydantic `CanonicalRecord` (`apps.adaptors.base`).
 
+## Type checking
+
+Pyright/basedpyright (Cursor, VS Code) and mypy use different engines:
+
+| Tool | Role |
+|------|------|
+| **basedpyright** / Pylance | IDE feedback; reads repo-root `pyrightconfig.json` |
+| **mypy + django-stubs plugin** | Django-aware checks (`id`, reverse FKs, settings) in CI |
+
+Pyright does **not** run the django-stubs mypy plugin, so ORM “magic” still needs light annotations or tuned diagnostics (see `pyproject.toml`).
+
+```bash
+pip install -r requirements-dev.txt
+cd django-monolith
+basedpyright apps config
+mypy apps config
+```
+
+Reload the editor window after changing `pyrightconfig.json` or `.vscode/settings.json`.
+
 ## Tests
 
 ```bash

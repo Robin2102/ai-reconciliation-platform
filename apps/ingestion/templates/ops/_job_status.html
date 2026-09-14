@@ -14,6 +14,10 @@
   {% elif ingest_file.status == "ingesting" %}
   <div class="flash flash-info">Ingest running… waiting for the worker.</div>
   {% elif ingest_file.status == "done" %}
-  <div class="flash flash-ok">Ingest finished. <a href="{% url 'ops-ingest' %}">Back to ingest</a></div>
+  <div class="flash flash-ok">
+    Ingest finished.
+    <a href="{% url 'ops-ingest-results' ingest_file.pk %}">View normalized rows</a>
+    · <a href="{% url 'ops-ingest' %}">Back to ingest</a>
+  </div>
   {% endif %}
 </div>

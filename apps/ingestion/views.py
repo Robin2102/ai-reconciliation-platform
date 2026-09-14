@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -21,10 +22,10 @@ class IngestUploadView(APIView):
     def post(self, request):
         serializer = IngestUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        uploaded = serializer.validated_data["file"]
-        source_type = serializer.validated_data["source_type"]
-        source_id = serializer.validated_data.get("source_id") or Path(uploaded.name).stem
+        data = cast(dict[str, Any], serializer.validated_data)
+        uploaded = data["file"]
+        source_type = data["source_type"]
+        source_id = data.get("source_id") or Path(uploaded.name).stem
 
         try:
             task = enqueue_ingest_file(source_type, source_id, uploaded)

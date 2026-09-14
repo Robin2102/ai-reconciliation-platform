@@ -11,6 +11,7 @@ from apps.adaptors.registry import list_registered_adapters
 from apps.ingestion.mapping import validate_template
 from apps.ingestion.models import IngestFile, MappingTemplate
 from apps.ingestion.services import infer_source_type, stage_uploaded_file
+from apps.ingestion.ingest_results import ingest_result_rows
 from apps.ingestion.studio import mapping_page_context, save_mapping_from_post
 from apps.ingestion.tasks import ingest_file_task
 
@@ -18,6 +19,7 @@ from apps.ingestion.tasks import ingest_file_task
 _SOURCE_TYPE_LABELS = {
     "csv": "CSV — delimited spreadsheet export",
     "txt": "TXT — delimited text (same parser as CSV)",
+    "xlsx": "Excel (.xlsx)",
 }
 
 
@@ -29,7 +31,7 @@ def source_type_choices():
 
 
 class IngestUploadForm(forms.Form):
-    file = forms.FileField(label="CSV or TXT file")
+    file = forms.FileField(label="CSV, TXT, or XLSX file")
     source_type = forms.ChoiceField(
         choices=(),
         initial="csv",
@@ -146,6 +148,24 @@ def mapping_studio(request, file_id: int):
 def mapping_job_status(request, file_id: int):
     ingest_file = get_object_or_404(IngestFile, pk=file_id)
     return render(request, "ops/_job_status.html", {"ingest_file": ingest_file})
+
+
+@staff_member_required(login_url="ops-login")
+def ingest_results(request, file_id: int):
+    ingest_file = get_object_or_404(IngestFile, pk=file_id)
+    if ingest_file.status != IngestFile.Status.DONE:
+        messages.info(request, "Normalized rows are available after a successful ingest.")
+        return redirect("ops-mapping", file_id=ingest_file.pk)
+
+    ctx = ingest_result_rows(ingest_file)
+    return render(
+        request,
+        "ops/ingest_results.html",
+        {
+            "ingest_file": ingest_file,
+            **ctx,
+        },
+    )
 
 
 @staff_member_required(login_url="ops-login")

@@ -24,6 +24,14 @@ from apps.reconciliation.models import save_canonical_records
 SourceInput = Union[str, Path, bytes, BinaryIO]
 
 _TXT_EXTENSIONS = {".txt", ".text"}
+_XLSX_EXTENSIONS = {".xlsx", ".xlsm"}
+
+
+def _file_starts_with_zip(path: Path) -> bool:
+    try:
+        return path.read_bytes()[:2] == b"PK"
+    except OSError:
+        return False
 
 NO_DATA_ROWS_MESSAGE = (
     "No data rows found in the file. Add at least one row below the header, use a delimited "
@@ -44,7 +52,18 @@ def infer_source_type(filename: str, source_type: str | None = None) -> str:
         return explicit
     if ext in _TXT_EXTENSIONS:
         return "txt"
+    if ext in _XLSX_EXTENSIONS:
+        return "xlsx"
     return "csv"
+
+
+def profiler_source_type(path: str | Path, source_type: str) -> str:
+    """Pick profiler/extract path (handles .xlsx staged as csv)."""
+    p = Path(path)
+    ext = p.suffix.lower()
+    if ext in _XLSX_EXTENSIONS or _file_starts_with_zip(p):
+        return "xlsx"
+    return source_type.lower()
 
 
 def count_extracted_rows(source_type: str, source_input: SourceInput) -> int:
@@ -100,6 +119,9 @@ def ingest_source(
     With a MappingTemplate, rows become CanonicalRecord via apply_column_mapping.
     Without one, CsvAdapter.normalize keeps the heuristic/legacy path.
     """
+    if isinstance(source_input, (str, Path)):
+        source_type = profiler_source_type(source_input, source_type)
+
     adapter_cls = get_adapter(source_type)
     adapter = adapter_cls()
     raw_rows = list(adapter.extract(source_input))
@@ -140,13 +162,14 @@ def ingest_source(
             source_id=source_id,
             raw_payload=payload,
             status="NORMALIZED",
+            ingest_file=ingest_file,
         )
         for payload in stored_rows
     ]
 
     with transaction.atomic():
         created_raw = RawRecord.objects.bulk_create(raw_instances, batch_size=1000)
-        created_tx = save_canonical_records(canonical_records)
+        created_tx = save_canonical_records(canonical_records, ingest_file=ingest_file)
 
     result = {
         "source_type": source_type.lower(),

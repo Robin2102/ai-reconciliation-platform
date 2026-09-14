@@ -8,7 +8,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from apps.adaptors.delimited import csv_dict_reader
+from apps.adaptors.delimited import csv_dict_reader, open_delimited_text
+from apps.adaptors.excel_io import extract_excel_rows
 
 SAMPLE_ROWS = 50
 
@@ -123,17 +124,7 @@ def infer_column_type(samples: list[str]) -> tuple[str, str]:
     return "string", ""
 
 
-def profile_delimited_file(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
-    file_path = Path(path)
-    with file_path.open(newline="", encoding="utf-8-sig") as handle:
-        reader = csv_dict_reader(handle)
-        headers = reader.fieldnames or []
-        rows: list[dict[str, str]] = []
-        for i, row in enumerate(reader):
-            if i >= sample_rows:
-                break
-            rows.append({h: (row.get(h) or "") for h in headers})
-
+def _profile_from_row_dicts(headers: list[str], rows: list[dict[str, str]]) -> dict[str, Any]:
     columns = []
     for header in headers:
         samples = [r.get(header, "") for r in rows]
@@ -152,6 +143,38 @@ def profile_delimited_file(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> 
             }
         )
     return {"headers": headers, "columns": columns, "sample_rows": rows}
+
+
+def profile_delimited_file(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
+    reader = csv_dict_reader(open_delimited_text(path))
+    headers = list(reader.fieldnames or [])
+    rows: list[dict[str, str]] = []
+    for i, row in enumerate(reader):
+        if i >= sample_rows:
+            break
+        rows.append({h: (row.get(h) or "") for h in headers})
+    return _profile_from_row_dicts(headers, rows)
+
+
+def profile_excel_file(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
+    headers: list[str] = []
+    rows: list[dict[str, str]] = []
+    for i, row in enumerate(extract_excel_rows(path)):
+        if not headers:
+            headers = list(row.keys())
+        if i >= sample_rows:
+            break
+        rows.append({h: str(row.get(h) or "") for h in headers})
+    return _profile_from_row_dicts(headers, rows)
+
+
+def profile_staged_file(path: str | Path, source_type: str, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
+    from apps.ingestion.services import profiler_source_type
+
+    kind = profiler_source_type(path, source_type)
+    if kind == "xlsx":
+        return profile_excel_file(path, sample_rows=sample_rows)
+    return profile_delimited_file(path, sample_rows=sample_rows)
 
 
 def profile_csv(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:

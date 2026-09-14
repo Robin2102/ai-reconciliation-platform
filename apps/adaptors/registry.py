@@ -35,5 +35,5 @@ def get_adapter(source_type: str) -> Type[DataSourceAdapter]:
 
 def list_registered_adapters() -> list[str]:
     """Return a list of all currently registered adapter keys."""
-    return sorted(list(_ADAPTER_REGISTRY.keys()))
+    return sorted(set[str](_ADAPTER_REGISTRY.keys()))
 

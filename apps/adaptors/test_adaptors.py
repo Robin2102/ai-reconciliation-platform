@@ -7,6 +7,8 @@ from django.test import TestCase
 from apps.adaptors.base import CanonicalRecord, DataSourceAdapter
 from apps.adaptors.csv_adapter import CsvAdapter
 from apps.adaptors.txt_adapter import TxtAdapter
+from apps.adaptors.excel_adapter import ExcelAdapter
+from openpyxl import Workbook
 from apps.adaptors.registry import get_adapter, register_adapter, list_registered_adapters
 from apps.ingestion.models import RawRecord
 from apps.reconciliation.models import Transaction, save_canonical_records
@@ -58,6 +60,11 @@ class TestAdapterRegistry(TestCase):
         adapter_cls = get_adapter("txt")
         self.assertEqual(adapter_cls, TxtAdapter)
         self.assertIn("txt", list_registered_adapters())
+
+    def test_xlsx_adapter_registered(self):
+        adapter_cls = get_adapter("xlsx")
+        self.assertEqual(adapter_cls, ExcelAdapter)
+        self.assertIn("xlsx", list_registered_adapters())
 
     def test_unregistered_adapter_raises_value_error(self):
         with self.assertRaises(ValueError) as ctx:
@@ -119,6 +126,25 @@ class TestCsvAdapter(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(set(rows[0].keys()), {"age", "job", "y"})
         self.assertEqual(rows[0]["age"], "30")
+
+
+class TestExcelAdapter(TestCase):
+    def setUp(self):
+        self.adapter = ExcelAdapter()
+
+    def test_extracts_xlsx_rows(self):
+        wb = Workbook()
+        ws = wb.active
+        assert ws is not None
+        ws.append(["txn_id", "F_TRANDATE", "amount"])
+        ws.append(["T1", "20260508", 100.5])
+        buf = io.BytesIO()
+        wb.save(buf)
+        rows = list(self.adapter.extract(buf.getvalue()))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["txn_id"], "T1")
+        self.assertEqual(rows[0]["F_TRANDATE"], "20260508")
+        self.assertEqual(rows[0]["amount"], "100.5")
 
 
 class TestTxtAdapter(TestCase):

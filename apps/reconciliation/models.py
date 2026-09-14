@@ -18,6 +18,13 @@ class Transaction(models.Model):
     timestamp = models.DateTimeField(db_index=True)
     description = models.TextField(blank=True, null=True)
     raw_payload = models.JSONField(default=dict, help_text="Original raw record payload")
+    ingest_file = models.ForeignKey(
+        "ingestion.IngestFile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -31,7 +38,11 @@ class Transaction(models.Model):
         return f"Transaction({self.source_id}:{self.external_ref} | Amount: {self.amount} {self.currency})"
 
 
-def save_canonical_records(records: List[CanonicalRecord], batch_size: int = 1000) -> List[Transaction]:
+def save_canonical_records(
+    records: List[CanonicalRecord],
+    batch_size: int = 1000,
+    ingest_file=None,
+) -> List[Transaction]:
     """
     Atomically bulk save a list of CanonicalRecord Pydantic objects into Django Transaction database instances.
     """
@@ -46,6 +57,7 @@ def save_canonical_records(records: List[CanonicalRecord], batch_size: int = 100
             timestamp=rec.timestamp,
             description=rec.description,
             raw_payload=rec.raw_payload,
+            ingest_file=ingest_file,
         )
         for rec in records
     ]

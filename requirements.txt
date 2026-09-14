@@ -9,7 +9,9 @@ confluent-kafka>=2.4       # Kafka producer/consumer client
 pydantic>=2.7              # used for internal data contracts, not just FastAPI
 cryptography>=43.0         # Fernet for PII columns at rest
 django-silk>=5.4           # request/SQL profiler UI (dev only)
-locust>=2.40               # load-testing client (run separately from Django)
+locust>=2.40
+openpyxl>=3.1.5
+               # load-testing client (run separately from Django)
 # --- AI layer (add when you reach apps/ai_agent) ---
 # openai / anthropic        # LLM client
 # sentence-transformers      # local embeddings option

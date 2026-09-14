@@ -18,4 +18,5 @@ urlpatterns = [
     path("files/", ops_views.ingest_file_list, name="ops-ingest-files"),
     path("mapping/<int:file_id>/", ops_views.mapping_studio, name="ops-mapping"),
     path("mapping/<int:file_id>/status/", ops_views.mapping_job_status, name="ops-mapping-status"),
+    path("results/<int:file_id>/", ops_views.ingest_results, name="ops-ingest-results"),
 ]
