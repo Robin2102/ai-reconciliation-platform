@@ -48,7 +48,7 @@ django-monolith/
 
 | Layer | Responsibility |
 | --- | --- |
-| Adaptors | Hide source format. `CsvAdapter` is registered as `source_type=csv`. |
+| Adaptors | Hide source format. `csv` and `txt` adapters share delimited extract (comma/semicolon/tab/pipe). |
 | Ingestion | Persist raw payloads, then validated canonical rows. |
 | Reconciliation | Store `Transaction`; matching strategies live under `engine/`. |
 | Infra | Postgres or SQLite; Redis (Celery); Compose Kafka + Kafka UI. |
@@ -135,7 +135,7 @@ Inspect topics at `http://localhost:8080`. The app talks to **one** bootstrap; r
 | Field | Required | Notes |
 | --- | --- | --- |
 | `file` | yes | CSV bytes |
-| `source_type` | no | Default `csv` |
+| `source_type` | no | `csv` (default) or `txt` |
 | `source_id` | no | Defaults to the filename stem |
 
 ```bash

@@ -18,6 +18,7 @@ DATE_FORMAT_TO_STRPTIME = {
     "DD/MM/YYYY": "%d/%m/%Y",
     "DD-MM-YYYY": "%d-%m-%Y",
     "YYYY-MM-DD": "%Y-%m-%d",
+    "YYYYMMDD": "%Y%m%d",
     "MM/DD/YYYY": "%m/%d/%Y",
     "ISO": "%Y-%m-%dT%H:%M:%S",
     "YYYY-MM-DD HH:MM:SS": "%Y-%m-%d %H:%M:%S",
@@ -94,6 +95,13 @@ def _parse_timestamp(val: Any, date_format: str, header: str = "timestamp") -> d
         try:
             parsed = datetime.fromisoformat(text)
             return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+
+    if re.fullmatch(r"\d{8}", text):
+        try:
+            parsed = datetime.strptime(text, "%Y%m%d")
+            return parsed.replace(tzinfo=timezone.utc)
         except ValueError:
             pass
 

@@ -9,3 +9,4 @@ class AdaptorsConfig(AppConfig):
     def ready(self):
         # Import concrete adapters so @register_adapter runs at startup.
         from . import csv_adapter  # noqa: F401
+        from . import txt_adapter  # noqa: F401

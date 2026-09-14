@@ -38,6 +38,11 @@ def ingest_file_task(ingest_file_id: int, template_id: int | None = None) -> dic
     )
     path = Path(ingest_file.path)
     try:
+        if not path.is_file():
+            raise ValueError(
+                "Staged file is missing on disk. Upload the file again "
+                "(successful ingest deletes the staged copy to avoid duplicate loads)."
+            )
         result = ingest_source(
             ingest_file.source_type,
             ingest_file.source_id,

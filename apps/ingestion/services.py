@@ -23,6 +23,35 @@ from apps.reconciliation.models import save_canonical_records
 
 SourceInput = Union[str, Path, bytes, BinaryIO]
 
+_TXT_EXTENSIONS = {".txt", ".text"}
+
+NO_DATA_ROWS_MESSAGE = (
+    "No data rows found in the file. Add at least one row below the header, use a delimited "
+    "text format (comma, semicolon, tab, or pipe), and save as UTF-8. Fixed-width .txt is not "
+    "supported yet."
+)
+
+
+def infer_source_type(filename: str, source_type: str | None = None) -> str:
+    """
+    Pick adapter key from extension when ops leaves the default csv.
+
+    Explicit non-csv source_type (e.g. txt) is respected.
+    """
+    explicit = (source_type or "csv").strip().lower()
+    ext = Path(filename or "").suffix.lower()
+    if explicit != "csv":
+        return explicit
+    if ext in _TXT_EXTENSIONS:
+        return "txt"
+    return "csv"
+
+
+def count_extracted_rows(source_type: str, source_input: SourceInput) -> int:
+    """How many data rows the adapter would yield (header row is not counted)."""
+    adapter_cls = get_adapter(source_type)
+    return sum(1 for _ in adapter_cls().extract(source_input))
+
 
 def persist_upload(uploaded_file, dest_dir: Path | None = None) -> Path:
     """
@@ -46,6 +75,9 @@ def persist_upload(uploaded_file, dest_dir: Path | None = None) -> Path:
 def stage_uploaded_file(uploaded_file, source_type: str, source_id: str) -> IngestFile:
     get_adapter(source_type)
     path = persist_upload(uploaded_file)
+    if count_extracted_rows(source_type, path) == 0:
+        path.unlink(missing_ok=True)
+        raise ValueError(NO_DATA_ROWS_MESSAGE)
     return IngestFile.objects.create(
         path=str(path),
         original_name=getattr(uploaded_file, "name", "") or path.name,
@@ -72,7 +104,14 @@ def ingest_source(
     adapter = adapter_cls()
     raw_rows = list(adapter.extract(source_input))
     if not raw_rows:
-        raise ValueError("No rows extracted from the source.")
+        path_hint = ""
+        if isinstance(source_input, (str, Path)):
+            p = Path(source_input)
+            if not p.exists():
+                path_hint = " The staged file is missing—upload again (a previous successful ingest removes the file from disk)."
+            elif p.stat().st_size == 0:
+                path_hint = " The staged file on disk is empty."
+        raise ValueError(NO_DATA_ROWS_MESSAGE + path_hint)
 
     if template is not None:
         columns = list(template.columns.all())

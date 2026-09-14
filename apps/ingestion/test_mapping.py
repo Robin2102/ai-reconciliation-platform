@@ -294,6 +294,26 @@ class TimestampParseTests(TestCase):
         self.assertEqual(rec.timestamp.month, 1)
         self.assertEqual(rec.timestamp.day, 1)
 
+    def test_compact_yyyymmdd_parses(self):
+        template = MappingTemplate.objects.create(name="d", source_id="compact", default_currency="INR")
+        ColumnMapping.objects.create(
+            template=template,
+            source_header="F_TRANDATE",
+            role="timestamp",
+            date_format="YYYY-MM-DD",
+            extra={"trim": True},
+        )
+        ColumnMapping.objects.create(template=template, source_header="id", role="external_ref")
+        ColumnMapping.objects.create(template=template, source_header="amt", role="amount")
+        rec = apply_column_mapping(
+            {"id": "1", "F_TRANDATE": "20260508", "amt": "10"},
+            template,
+            "compact",
+        )
+        self.assertEqual(rec.timestamp.year, 2026)
+        self.assertEqual(rec.timestamp.month, 5)
+        self.assertEqual(rec.timestamp.day, 8)
+
 
 class ValidateTemplateTests(TestCase):
     def test_ref_and_amount_without_date_fails(self):

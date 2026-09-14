@@ -8,7 +8,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.ingestion.models import IngestFile, RawRecord
-from apps.ingestion.services import ingest_source
+from apps.ingestion.services import infer_source_type, ingest_source
 from apps.reconciliation.models import Transaction
 
 
@@ -17,6 +17,17 @@ CSV_BODY = (
     "TXN-101,2026-09-12,1500.50,0.00,Salary,INR\n"
     "TXN-102,2026-09-12,0.00,200.00,Vendor,INR\n"
 )
+
+
+class InferSourceTypeTests(TestCase):
+    def test_txt_extension_defaults_to_txt_adapter(self):
+        self.assertEqual(infer_source_type("ledger.txt", "csv"), "txt")
+
+    def test_csv_extension_stays_csv(self):
+        self.assertEqual(infer_source_type("ledger.csv", "csv"), "csv")
+
+    def test_explicit_txt_respected(self):
+        self.assertEqual(infer_source_type("data.csv", "txt"), "txt")
 
 
 class IngestUploadApiTests(TestCase):
@@ -176,15 +187,22 @@ class IngestOpsTests(TestCase):
         home = self.client.get(self.upload_url)
         self.assertContains(home, "261")
 
-    def test_unknown_adapter_stays_on_form(self):
-        upload = SimpleUploadedFile("data.csv", CSV_BODY.encode("utf-8"), content_type="text/csv")
+    def test_header_only_file_rejected_at_stage(self):
+        body = "txn_id,date,credit,debit\n"
+        upload = SimpleUploadedFile("headers_only.csv", body.encode("utf-8"), content_type="text/csv")
         response = self.client.post(
             self.upload_url,
-            {"file": upload, "source_type": "sap", "source_id": "bad"},
+            {"file": upload, "source_type": "csv", "source_id": "empty"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "sap")
-        self.assertEqual(RawRecord.objects.count(), 0)
+        self.assertContains(response, "No data rows")
+        self.assertEqual(IngestFile.objects.filter(source_id="empty").count(), 0)
+
+    def test_upload_form_lists_registered_adapters(self):
+        response = self.client.get(self.upload_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "CSV — delimited")
+        self.assertContains(response, "TXT — delimited")
 
 
 class KafkaPublishTests(TestCase):

@@ -6,6 +6,7 @@ from django.test import TestCase
 
 from apps.adaptors.base import CanonicalRecord, DataSourceAdapter
 from apps.adaptors.csv_adapter import CsvAdapter
+from apps.adaptors.txt_adapter import TxtAdapter
 from apps.adaptors.registry import get_adapter, register_adapter, list_registered_adapters
 from apps.ingestion.models import RawRecord
 from apps.reconciliation.models import Transaction, save_canonical_records
@@ -52,6 +53,11 @@ class TestAdapterRegistry(TestCase):
         adapter_cls = get_adapter("csv")
         self.assertEqual(adapter_cls, CsvAdapter)
         self.assertIn("csv", list_registered_adapters())
+
+    def test_txt_adapter_registered(self):
+        adapter_cls = get_adapter("txt")
+        self.assertEqual(adapter_cls, TxtAdapter)
+        self.assertIn("txt", list_registered_adapters())
 
     def test_unregistered_adapter_raises_value_error(self):
         with self.assertRaises(ValueError) as ctx:
@@ -113,6 +119,18 @@ class TestCsvAdapter(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(set(rows[0].keys()), {"age", "job", "y"})
         self.assertEqual(rows[0]["age"], "30")
+
+
+class TestTxtAdapter(TestCase):
+    def setUp(self):
+        self.adapter = TxtAdapter()
+
+    def test_extracts_tab_delimited_txt(self):
+        body = "txn_id\tdate\tamount\nT1\t2022-01-01\t100.00\n"
+        rows = list(self.adapter.extract(io.StringIO(body)))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["txn_id"], "T1")
+        self.assertEqual(rows[0]["amount"], "100.00")
 
 
 class TestIngestionAndPersistence(TestCase):

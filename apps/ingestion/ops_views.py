@@ -7,22 +7,56 @@ from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
+from apps.adaptors.registry import list_registered_adapters
 from apps.ingestion.mapping import validate_template
-from apps.ingestion.models import IngestFile
-from apps.ingestion.services import stage_uploaded_file
+from apps.ingestion.models import IngestFile, MappingTemplate
+from apps.ingestion.services import infer_source_type, stage_uploaded_file
 from apps.ingestion.studio import mapping_page_context, save_mapping_from_post
 from apps.ingestion.tasks import ingest_file_task
 
 
+_SOURCE_TYPE_LABELS = {
+    "csv": "CSV — delimited spreadsheet export",
+    "txt": "TXT — delimited text (same parser as CSV)",
+}
+
+
+def source_type_choices():
+    return [
+        (key, _SOURCE_TYPE_LABELS.get(key, key.upper()))
+        for key in list_registered_adapters()
+    ]
+
+
 class IngestUploadForm(forms.Form):
-    file = forms.FileField(label="CSV file")
-    source_type = forms.CharField(initial="csv", max_length=50, label="Source type")
+    file = forms.FileField(label="CSV or TXT file")
+    source_type = forms.ChoiceField(
+        choices=(),
+        initial="csv",
+        label="Source type",
+        help_text="Pick the adapter. A .txt file is auto-selected as TXT when you leave CSV selected.",
+    )
     source_id = forms.CharField(
         required=False,
         max_length=100,
-        label="Source ID",
-        help_text="Defaults to the filename. Reused to load last month’s mapping template.",
+        label="Feed key",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "e.g. hdfc-current (optional)",
+                "list": "known-feed-keys",
+                "autocomplete": "off",
+            }
+        ),
+        help_text=(
+            "Stable name for this bank or feed (not shown in the file). "
+            "Leave blank to use the file name without extension. "
+            "Reusing the same key loads your last saved column mapping."
+        ),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["source_type"].choices = source_type_choices()
 
 
 @staff_member_required(login_url="ops-login")
@@ -30,7 +64,7 @@ def ingest_home(request):
     form = IngestUploadForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         uploaded = form.cleaned_data["file"]
-        source_type = form.cleaned_data["source_type"]
+        source_type = infer_source_type(uploaded.name, form.cleaned_data["source_type"])
         source_id = form.cleaned_data.get("source_id") or Path(uploaded.name).stem
         try:
             ingest_file = stage_uploaded_file(uploaded, source_type, source_id)
@@ -41,12 +75,16 @@ def ingest_home(request):
             return redirect("ops-mapping", file_id=ingest_file.pk)
 
     files = IngestFile.objects.all()[:25]
+    known_feed_keys = list(
+        MappingTemplate.objects.order_by("-updated_at").values_list("source_id", flat=True).distinct()[:30]
+    )
     return render(
         request,
         "ops/ingest_home.html",
         {
             "form": form,
             "ingest_files": files,
+            "known_feed_keys": known_feed_keys,
             "poll": any(f.status == IngestFile.Status.INGESTING for f in files),
         },
     )

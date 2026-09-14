@@ -8,6 +8,7 @@ DATE_FORMAT_CHOICES = [
     "DD/MM/YYYY",
     "DD-MM-YYYY",
     "YYYY-MM-DD",
+    "YYYYMMDD",
     "MM/DD/YYYY",
     "ISO",
     "YYYY-MM-DD HH:MM:SS",

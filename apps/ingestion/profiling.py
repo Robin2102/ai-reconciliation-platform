@@ -8,12 +8,13 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from apps.adaptors.csv_adapter import csv_dict_reader
+from apps.adaptors.delimited import csv_dict_reader
 
 SAMPLE_ROWS = 50
 
 DATE_FORMATS = [
     ("%Y-%m-%d", "YYYY-MM-DD"),
+    ("%Y%m%d", "YYYYMMDD"),
     ("%d/%m/%Y", "DD/MM/YYYY"),
     ("%d-%m-%Y", "DD-MM-YYYY"),
     ("%m/%d/%Y", "MM/DD/YYYY"),
@@ -122,7 +123,7 @@ def infer_column_type(samples: list[str]) -> tuple[str, str]:
     return "string", ""
 
 
-def profile_csv(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
+def profile_delimited_file(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
     file_path = Path(path)
     with file_path.open(newline="", encoding="utf-8-sig") as handle:
         reader = csv_dict_reader(handle)
@@ -151,3 +152,8 @@ def profile_csv(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, A
             }
         )
     return {"headers": headers, "columns": columns, "sample_rows": rows}
+
+
+def profile_csv(path: str | Path, sample_rows: int = SAMPLE_ROWS) -> dict[str, Any]:
+    """Alias for staged CSV/TXT files (same delimited profiler)."""
+    return profile_delimited_file(path, sample_rows=sample_rows)

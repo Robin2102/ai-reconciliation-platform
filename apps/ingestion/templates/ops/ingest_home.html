@@ -23,11 +23,21 @@
       <div>
         <label for="{{ form.source_type.id_for_label }}">{{ form.source_type.label }}</label>
         {{ form.source_type }}
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">{{ form.source_type.help_text }}</div>
+        {{ form.source_type.errors }}
       </div>
-      <div style="flex:1 1 160px">
+      <div style="flex:1 1 220px">
         <label for="{{ form.source_id.id_for_label }}">{{ form.source_id.label }}</label>
         {{ form.source_id }}
+        {% if known_feed_keys %}
+        <datalist id="known-feed-keys">
+          {% for key in known_feed_keys %}
+          <option value="{{ key }}"></option>
+          {% endfor %}
+        </datalist>
+        {% endif %}
         <div style="color:var(--muted);font-size:12px;margin-top:4px">{{ form.source_id.help_text }}</div>
+        {{ form.source_id.errors }}
       </div>
     </div>
     <div class="actions">

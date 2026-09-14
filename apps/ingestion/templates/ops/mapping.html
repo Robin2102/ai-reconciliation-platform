@@ -22,6 +22,14 @@
 
 {% include "ops/_job_status.html" %}
 
+{% if not sample_matrix %}
+<div class="card" style="border-color:var(--warn)">
+  <strong>No data rows detected.</strong>
+  Ingest will fail until the file has a header row and at least one data row (comma, semicolon, tab, or pipe separated).
+  Fixed-width text is not supported. <a href="{% url 'ops-ingest' %}">Upload a different file</a>.
+</div>
+{% endif %}
+
 <form id="mapping-form" method="post">
   {% csrf_token %}
 
