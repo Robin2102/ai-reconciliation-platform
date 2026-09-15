@@ -3,12 +3,16 @@
 {% block title %}Map columns{% endblock %}
 
 {% block content %}
-<p class="steps">1. Upload → <b>2. Map columns</b> → 3. Run ingest</p>
+{% if ingestion_job %}
+<p class="steps">1. Files → <b>2. Map columns</b> → 3. Run ingestion job</p>
+{% else %}
+<p class="steps">1. Files → <b>2. Map columns</b> → 3. Run ingest</p>
+{% endif %}
 <h1 class="page-title">Mapping studio</h1>
 <p class="lede">
   {{ ingest_file.original_name }}
   · source <code>{{ ingest_file.source_id }}</code>
-  · <span class="badge {{ ingest_file.status }}">{{ ingest_file.status }}</span>
+  {% if ingest_file.pk %}· <span class="badge {{ ingest_file.status }}">{{ ingest_file.status }}</span>{% endif %}
   · {{ column_rows|length }} columns
   · {{ sample_matrix|length }} sample rows.
     Encrypted PII stays in raw_payload and is not used for matching.
@@ -20,17 +24,26 @@
   <strong>Refs:</strong> map one or more Reference columns; values join with <code>|</code> for matching.
 </p>
 
-{% include "ops/_job_status.html" %}
+{% if ingestion_job and job_mapping_refresh_url %}
+<form method="post" action="{{ job_mapping_refresh_url }}" class="toolbar" style="margin-bottom:1rem">
+  {% csrf_token %}
+  <button class="btn secondary" type="submit">Re-fetch file &amp; columns</button>
+  <span class="lede" style="font-size:12px;margin:0">
+    Pulls the first job file again from upload/connector and re-runs column detection (e.g. after fixing .out / .txt handling).
+  </span>
+</form>
+{% endif %}
 
 {% if not sample_matrix %}
 <div class="card" style="border-color:var(--warn)">
   <strong>No data rows detected.</strong>
   Ingest will fail until the file has a header row and at least one data row (comma, semicolon, tab, or pipe separated).
-  Fixed-width text is not supported. <a href="{% url 'ops-ingest' %}">Upload a different file</a>.
+  Fixed-width text is not supported.
+  {% if ingestion_job %}<a href="{% url 'ops-job-detail' ingestion_job.pk %}">Back to job</a>{% endif %}
 </div>
 {% endif %}
 
-<form id="mapping-form" method="post">
+<form id="mapping-form" method="post"{% if mapping_post_url %} action="{{ mapping_post_url }}"{% endif %}>
   {% csrf_token %}
 
   <div class="card">
@@ -114,17 +127,21 @@
       </table>
     </div>
     <div class="actions">
+      {% if hide_run_ingest %}
+      <button class="btn" type="submit" name="action" value="save">Save mapping</button>
+      {% else %}
       <button class="btn" type="submit" name="action" value="ingest">Run ingest</button>
       <button
         class="btn secondary"
         type="submit"
         name="action"
         value="save"
-        hx-post="{% url 'ops-mapping' ingest_file.pk %}"
+        {% if mapping_post_url %}hx-post="{{ mapping_post_url }}"{% endif %}
         hx-target="#save-status"
         hx-swap="innerHTML"
       >Save template</button>
-      <a class="btn ghost" href="{% url 'ops-ingest' %}">Back</a>
+      {% endif %}
+      <a class="btn ghost" href="{% if cancel_url %}{{ cancel_url }}{% else %}{% url 'ops-jobs' %}{% endif %}">Back</a>
     </div>
   </div>
 </form>

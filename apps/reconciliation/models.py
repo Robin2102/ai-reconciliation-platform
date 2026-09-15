@@ -17,6 +17,13 @@ class Transaction(models.Model):
     currency = models.CharField(max_length=10, default="INR")
     timestamp = models.DateTimeField(db_index=True)
     description = models.TextField(blank=True, null=True)
+    source_filename = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Originating file when multiple files were merged in one ingestion job.",
+    )
     raw_payload = models.JSONField(default=dict, help_text="Original raw record payload")
     ingest_file = models.ForeignKey(
         "ingestion.IngestFile",
@@ -56,6 +63,7 @@ def save_canonical_records(
             currency=rec.currency,
             timestamp=rec.timestamp,
             description=rec.description,
+            source_filename=(rec.raw_payload.get("_generated") or {}).get("source_filename") or "",
             raw_payload=rec.raw_payload,
             ingest_file=ingest_file,
         )

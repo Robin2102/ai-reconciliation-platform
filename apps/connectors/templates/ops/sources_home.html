@@ -1,0 +1,25 @@
+{% extends "ops/base.html" %}
+{% block title %}Sources{% endblock %}
+{% block content %}
+<h1 class="page-title">Sources</h1>
+<p class="lede">Logical feeds (<code>source_id</code>) with one or more files from a connector.</p>
+<a class="btn" href="{% url 'ops-source-create' %}">New source</a>
+<div class="card" style="padding:0;margin-top:1rem">
+  <table class="data">
+    <thead><tr><th>Name</th><th>Feed key</th><th>Connector</th><th>Files</th><th></th></tr></thead>
+    <tbody>
+      {% for s in sources %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td><code>{{ s.source_id }}</code></td>
+        <td>{% if s.connector %}{{ s.connector.name }}{% else %}—{% endif %}</td>
+        <td>{{ s.file_specs.count }}</td>
+        <td><a href="{% url 'ops-source-detail' s.pk %}">Open</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">No sources yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

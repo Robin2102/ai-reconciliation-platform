@@ -1,0 +1,20 @@
+{% extends "ops/base.html" %}
+
+{% block title %}New connector{% endblock %}
+
+{% block content %}
+<p class="steps"><a href="{% url 'ops-connectors' %}">Connectors</a> → <b>New</b></p>
+<h1 class="page-title">New local directory connector</h1>
+<form method="post" class="card" style="max-width:520px">
+  {% csrf_token %}
+  {% for field in form %}
+  <p>
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<span class="lede" style="font-size:12px">{{ field.help_text }}</span>{% endif %}
+    {{ field.errors }}
+  </p>
+  {% endfor %}
+  <button class="btn" type="submit">Save</button>
+</form>
+{% endblock %}

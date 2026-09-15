@@ -1,0 +1,31 @@
+{% extends "ops/base.html" %}
+
+{% block title %}Connectors{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Connectors</h1>
+<p class="lede">Local directory connectors. Point base path at <code>django-monolith/uploads</code> (or a subfolder). Next: <b>Sources</b> (Phase B) to pick multiple files per feed.</p>
+<div class="actions" style="margin-bottom:1rem">
+  <a class="btn" href="{% url 'ops-connector-create' %}">New connector</a>
+</div>
+<div class="card" style="padding:0">
+  <table class="data">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Active</th><th>Base path</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for c in connectors %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td>{{ c.get_connector_type_display }}</td>
+        <td>{% if c.is_active %}yes{% else %}no{% endif %}</td>
+        <td><code>{{ c.config.base_path }}</code></td>
+        <td><a href="{% url 'ops-connector-detail' c.pk %}">Open</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">No connectors yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

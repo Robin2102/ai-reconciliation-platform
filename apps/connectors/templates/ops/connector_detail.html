@@ -1,0 +1,68 @@
+{% extends "ops/base.html" %}
+
+{% block title %}{{ connector.name }}{% endblock %}
+
+{% block content %}
+<p class="steps"><a href="{% url 'ops-connectors' %}">Connectors</a> → <b>{{ connector.name }}</b></p>
+<h1 class="page-title">{{ connector.name }}</h1>
+<p class="lede">{{ connector.get_connector_type_display }} · {% if connector.is_active %}active{% else %}disabled{% endif %}</p>
+
+<div class="row">
+  <div class="card" style="flex:1 1 320px">
+    <h2 style="margin-top:0;font-size:1rem;">Settings</h2>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+      <p>
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {{ field.errors }}
+      </p>
+      {% endfor %}
+      <button class="btn secondary" type="submit">Update</button>
+    </form>
+    <form method="post" action="{% url 'ops-connector-test' connector.pk %}" style="margin-top:1rem">
+      {% csrf_token %}
+      <button class="btn" type="submit">Test connection</button>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="padding:0">
+  <h2 style="padding:1rem 1.2rem 0;margin:0;font-size:1rem;">Browse files</h2>
+  {% if browse_error %}
+  <p class="errornote" style="padding:1rem">{{ browse_error }}</p>
+  {% elif browse %}
+  <p class="lede" style="padding:0 1.2rem">
+    Path: <code>/{{ browse.path }}</code>
+    {% if browse.parent_path is not None %}
+    · <a href="?path={{ browse.parent_path }}">Up</a>
+    {% endif %}
+  </p>
+  <div class="scroll" style="max-height:50vh">
+    <table class="data">
+      <thead><tr><th>Name</th><th>Type</th><th>Size</th><th></th></tr></thead>
+      <tbody>
+        {% for e in browse.entries %}
+        <tr>
+          <td>{% if e.entry_type == "dir" %}📁{% else %}📄{% endif %} {{ e.name }}</td>
+          <td>{{ e.entry_type }}</td>
+          <td>{% if e.size %}{{ e.size }}{% else %}—{% endif %}</td>
+          <td>
+            {% if e.entry_type == "dir" %}
+            <a href="?path={{ e.path }}">Open</a>
+            {% else %}
+            <code>{{ e.path }}</code>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">Empty directory.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+<p class="lede" style="font-size:12px">To ingest files, open <a href="{% url 'ops-job-create' %}?fresh=1">New ingestion job</a> and select this connector.</p>
+{% endblock %}

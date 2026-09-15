@@ -1,8 +1,7 @@
 """
 Ingest pipeline: adapter → staging → canonical.
 
-HTTP/admin only persist the file and enqueue. parse+insert stays here so the
-Celery worker and tests call the same function.
+Job runs and tests call `ingest_source` here for extract → normalize → persist.
 """
 
 from __future__ import annotations
@@ -23,7 +22,8 @@ from apps.reconciliation.models import save_canonical_records
 
 SourceInput = Union[str, Path, bytes, BinaryIO]
 
-_TXT_EXTENSIONS = {".txt", ".text"}
+# Delimited exports (bank feeds often use .out)
+_TXT_EXTENSIONS = {".txt", ".text", ".out"}
 _XLSX_EXTENSIONS = {".xlsx", ".xlsm"}
 _PDF_EXTENSIONS = {".pdf"}
 
@@ -75,6 +75,8 @@ def profiler_source_type(path: str | Path, source_type: str) -> str:
         return "pdf"
     if ext in _XLSX_EXTENSIONS or _file_starts_with_zip(p):
         return "xlsx"
+    if ext in _TXT_EXTENSIONS:
+        return "txt"
     return source_type.lower()
 
 
@@ -103,21 +105,6 @@ def persist_upload(uploaded_file, dest_dir: Path | None = None) -> Path:
     return path
 
 
-def stage_uploaded_file(uploaded_file, source_type: str, source_id: str) -> IngestFile:
-    get_adapter(source_type)
-    path = persist_upload(uploaded_file)
-    if count_extracted_rows(source_type, path) == 0:
-        path.unlink(missing_ok=True)
-        raise ValueError(NO_DATA_ROWS_MESSAGE)
-    return IngestFile.objects.create(
-        path=str(path),
-        original_name=getattr(uploaded_file, "name", "") or path.name,
-        source_type=source_type.lower(),
-        source_id=source_id,
-        status=IngestFile.Status.STAGED,
-    )
-
-
 def ingest_source(
     source_type: str,
     source_id: str,
@@ -129,7 +116,7 @@ def ingest_source(
     Extract raw rows, persist them for audit, normalize, persist Transactions.
 
     With a MappingTemplate, rows become CanonicalRecord via apply_column_mapping.
-    Without one, adapter.normalize uses HeuristicTabularNormalizer (legacy API path).
+    Without one, adapter.normalize uses HeuristicTabularNormalizer (tests / direct calls only).
     """
     if isinstance(source_input, (str, Path)):
         source_type = profiler_source_type(source_input, source_type)

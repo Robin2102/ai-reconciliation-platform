@@ -1,0 +1,387 @@
+{% extends "ops/base.html" %}
+{% load job_ops_tags %}
+{% block title %}New ingestion job{% endblock %}
+{% block content %}
+<p class="steps"><a href="{% url 'ops-jobs' %}">Ingestion jobs</a> → <b>New</b></p>
+<h1 class="page-title">New ingestion job</h1>
+<p class="lede">
+  Pick files (upload or connector). Up to <strong>{{ max_files }}</strong> merge into one ingest;
+  each row gets <code>source_filename</code>. Then map columns and run.
+</p>
+
+<form method="post" enctype="multipart/form-data" id="job-create-form">
+  {% csrf_token %}
+  <input type="hidden" name="connector_type" value="{{ connector_type }}">
+  <input type="hidden" name="browse_path" value="{{ browse_path }}">
+
+  <div class="card" style="max-width:720px">
+    <h2 style="margin-top:0;font-size:1rem;">Job details</h2>
+    {% if form.non_field_errors %}<p class="errornote">{{ form.non_field_errors }}</p>{% endif %}
+    <p>
+      <label for="id_name">{{ form.name.label }}</label>
+      {{ form.name }}
+      {{ form.name.errors }}
+    </p>
+    <p>
+      <label for="id_source_id">{{ form.source_id.label }}</label>
+      {{ form.source_id }}
+      <span class="lede" style="display:block;font-size:12px">Stable feed key for mapping templates and reconciliation.</span>
+      {{ form.source_id.errors }}
+    </p>
+    <p>
+      <label for="id_default_source_type">{{ form.default_source_type.label }}</label>
+      {{ form.default_source_type }}
+      <span class="lede" style="display:block;font-size:12px">Auto-adjusted from the first file (.txt / .out → delimited text adapter).</span>
+    </p>
+    <fieldset style="border:0;padding:0;margin:1rem 0">
+      <legend style="margin-bottom:.5rem">Input mode</legend>
+      {% for radio in form.input_mode %}
+      <label class="check" style="display:inline-block;margin-right:1rem">{{ radio.tag }} {{ radio.choice_label }}</label>
+      {% endfor %}
+    </fieldset>
+  </div>
+
+  <div class="card" id="panel-upload" style="max-width:720px;margin-top:1rem">
+    <h2 style="margin-top:0;font-size:1rem;">Upload files</h2>
+    <p>
+      <input type="file" name="files" id="id_files" multiple accept=".csv,.txt,.out,.xlsx,.pdf">
+    </p>
+  </div>
+
+  <div class="card" id="panel-connector" style="margin-top:1rem">
+    <h2 style="margin-top:0;font-size:1rem;">Connector</h2>
+    <div class="toolbar" style="flex-wrap:wrap;gap:.5rem;margin-bottom:1rem">
+      {% for type_value, type_label, enabled in connector_type_cards %}
+      <a
+        class="btn {% if connector_type == type_value %}secondary{% else %}ghost{% endif %} job-browse-nav"
+        href="{% job_browse_url type=type_value input_mode='connector' %}"
+        {% if not enabled %}style="opacity:.45;pointer-events:none" title="Coming soon"{% endif %}
+      >{{ type_label }}</a>
+      {% endfor %}
+    </div>
+
+    <div class="row" style="display:flex;flex-wrap:wrap;gap:1rem">
+      <div class="card" style="flex:1 1 280px;background:var(--panel-2)">
+        <h3 style="margin:0 0 .75rem;font-size:.95rem">Use existing</h3>
+        {% if connectors %}
+        <ul style="margin:0;padding-left:1.2rem">
+          {% for c in connectors %}
+          <li>
+            <a class="job-browse-nav" href="{% job_browse_url connector=c.pk input_mode='connector' %}">{{ c.name }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="lede" style="margin:0">No {{ connector_type }} connectors yet — create one on the right.</p>
+        {% endif %}
+        {% if selected_connector %}
+        <p style="margin-top:1rem">
+          <strong>Selected:</strong> {{ selected_connector.name }}
+          <a class="btn ghost job-browse-nav" href="{% job_browse_url connector=selected_connector.pk test=1 input_mode='connector' %}">Test connection</a>
+        </p>
+        {% if test_message %}<p class="lede">{{ test_message }}</p>{% endif %}
+        <input type="hidden" name="connector_id" value="{{ selected_connector.pk }}">
+        {% endif %}
+        {% if connector_type == "local_directory" %}
+        <p class="lede" style="margin-top:1rem;font-size:12px">
+          New connector? Use the <a href="#connector-create-panel">panel below</a> or <a href="{% url 'ops-connectors' %}">Connectors</a>.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if selected_connector %}
+    <div style="margin-top:1rem;padding:0">
+      <h3 style="font-size:.95rem">Browse &amp; select files (max {{ max_files }})</h3>
+      <p id="selected-files-summary" class="lede" style="font-size:12px"></p>
+      {% if browse_error %}
+      <p class="errornote">{{ browse_error }}</p>
+      {% elif browse %}
+      <p class="lede">
+        Path: <code>/{{ browse.path }}</code>
+        {% if browse.parent_path is not None %}
+        · <a class="job-browse-nav" href="{% job_browse_url path=browse.parent_path connector=selected_connector.pk input_mode='connector' %}">Up</a>
+        {% endif %}
+      </p>
+      <div class="scroll" style="max-height:40vh">
+        <table class="data">
+          <thead><tr><th></th><th>Name</th><th>Type</th><th></th></tr></thead>
+          <tbody>
+            {% for e in browse.entries %}
+            <tr>
+              <td>
+                {% if e.entry_type == "file" %}
+                <input
+                  type="checkbox"
+                  class="file-select"
+                  name="remote_paths"
+                  value="{{ e.path }}"
+                  form="job-create-form"
+                  data-path="{{ e.path }}"
+                  {% if e.path in selected_paths %}checked{% endif %}
+                >
+                {% endif %}
+              </td>
+              <td>{{ e.name }}</td>
+              <td>{{ e.entry_type }}</td>
+              <td>
+                {% if e.entry_type == "dir" %}
+                <a class="job-browse-nav" href="{% job_browse_url path=e.path connector=selected_connector.pk input_mode='connector' %}">Open</a>
+                {% else %}
+                <code style="font-size:11px">{{ e.path }}</code>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Empty directory.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div id="remote-path-hidden"></div>
+
+  <div class="actions" style="margin-top:1.25rem">
+    <button class="btn" type="submit" id="btn-create-job" form="job-create-form" name="action" value="create_job">Create job &amp; open mapping</button>
+    <a class="btn ghost" href="{% url 'ops-jobs' %}">Cancel</a>
+  </div>
+</form>
+
+{% if connector_type == "local_directory" %}
+<div class="card" id="connector-create-panel" style="max-width:720px;margin-top:1rem;background:var(--panel-2)">
+  <h2 style="margin-top:0;font-size:1rem;">Create local directory connector</h2>
+  <p class="lede" style="font-size:12px;margin-top:0">Optional — not required to create an ingestion job with an existing connector.</p>
+  <form method="post" id="connector-create-form" action="{% url 'ops-job-create' %}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_connector">
+    <input type="hidden" name="connector_type" value="{{ connector_type }}">
+    {% for field in new_connector_form %}
+    <p>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {{ field.errors }}
+    </p>
+    {% endfor %}
+    <button class="btn secondary" type="submit">Save connector</button>
+  </form>
+</div>
+{% endif %}
+
+{{ selected_paths|json_script:"server-selected-paths" }}
+
+<script>
+(function () {
+  const STORAGE_KEY = "ingestion_job_create_v1";
+  const maxFiles = {{ max_files }};
+  const form = document.getElementById("job-create-form");
+  if (!form) return;
+
+  const uploadPanel = document.getElementById("panel-upload");
+  const connectorPanel = document.getElementById("panel-connector");
+  const hasConnector = {{ selected_connector|yesno:"true,false" }};
+  const wizardFresh = {{ wizard_fresh|yesno:"true,false" }};
+  const selNode = document.getElementById("server-selected-paths");
+  const serverSelected = selNode ? JSON.parse(selNode.textContent) : [];
+
+  if (wizardFresh) {
+    sessionStorage.removeItem(STORAGE_KEY);
+  }
+
+  function loadStore() {
+    try {
+      return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveStore(data) {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  function readFormDraft() {
+    return {
+      name: form.querySelector("#id_name")?.value || "",
+      source_id: form.querySelector("#id_source_id")?.value || "",
+      default_source_type: form.querySelector("#id_default_source_type")?.value || "csv",
+      input_mode: form.querySelector('input[name="input_mode"]:checked')?.value || "upload",
+      paths: getSelectedPathsFromDom(),
+    };
+  }
+
+  function applyDraftToForm(draft) {
+    if (draft.name && form.querySelector("#id_name") && !form.querySelector("#id_name").value) {
+      form.querySelector("#id_name").value = draft.name;
+    }
+    if (draft.source_id && form.querySelector("#id_source_id") && !form.querySelector("#id_source_id").value) {
+      form.querySelector("#id_source_id").value = draft.source_id;
+    }
+    if (draft.default_source_type && form.querySelector("#id_default_source_type")) {
+      form.querySelector("#id_default_source_type").value = draft.default_source_type;
+    }
+    if (draft.input_mode) {
+      const radio = form.querySelector('input[name="input_mode"][value="' + draft.input_mode + '"]');
+      if (radio) radio.checked = true;
+    }
+  }
+
+  function getSelectedPathsFromDom() {
+    const paths = [];
+    form.querySelectorAll(".file-select:checked").forEach((el) => {
+      if (el.value) paths.push(el.value);
+    });
+    return paths;
+  }
+
+  function getSelectedPaths() {
+    const store = loadStore();
+    const merged = new Set([...(store.paths || []), ...getSelectedPathsFromDom()]);
+    return Array.from(merged);
+  }
+
+  function syncCheckboxesFromStore() {
+    const paths = new Set(getSelectedPaths());
+    form.querySelectorAll(".file-select").forEach((el) => {
+      el.checked = paths.has(el.dataset.path || el.value);
+    });
+    updateSummary();
+  }
+
+  function updateSummary() {
+    const el = document.getElementById("selected-files-summary");
+    if (!el) return;
+    const paths = getSelectedPaths();
+    if (!paths.length) {
+      el.textContent = "No files selected yet.";
+      return;
+    }
+    el.textContent = paths.length + " file(s) selected (across folders): " + paths.map((p) => p.split("/").pop()).join(", ");
+  }
+
+  function persistPathsToStore() {
+    const store = loadStore();
+    store.paths = getSelectedPaths();
+    const draft = readFormDraft();
+    store.name = draft.name;
+    store.source_id = draft.source_id;
+    store.default_source_type = draft.default_source_type;
+    store.input_mode = draft.input_mode;
+    saveStore(store);
+  }
+
+  function syncPanels() {
+    if (hasConnector) {
+      const connRadio = form.querySelector('input[name="input_mode"][value="connector"]');
+      if (connRadio) connRadio.checked = true;
+    }
+    const mode = form.querySelector('input[name="input_mode"]:checked')?.value || "upload";
+    const showConnector = mode === "connector" || hasConnector;
+    uploadPanel.style.display = mode === "upload" && !hasConnector ? "block" : (mode === "upload" ? "block" : "none");
+    connectorPanel.style.display = showConnector ? "block" : "none";
+  }
+
+  function appendDraftToUrl(href) {
+    const url = new URL(href, window.location.origin);
+    const draft = readFormDraft();
+    persistPathsToStore();
+    url.searchParams.set("name", draft.name);
+    url.searchParams.set("source_id", draft.source_id);
+    url.searchParams.set("default_source_type", draft.default_source_type);
+    url.searchParams.set("input_mode", hasConnector ? "connector" : draft.input_mode);
+    url.searchParams.delete("selected");
+    getSelectedPaths().forEach((p) => url.searchParams.append("selected", p));
+    return url.pathname + url.search;
+  }
+
+  document.querySelectorAll("a.job-browse-nav").forEach((a) => {
+    a.addEventListener("click", function (e) {
+      persistPathsToStore();
+      a.href = appendDraftToUrl(a.getAttribute("href"));
+    });
+  });
+
+  form.querySelectorAll('input[name="input_mode"]').forEach((r) => {
+    r.addEventListener("change", () => { syncPanels(); persistPathsToStore(); });
+  });
+  ["#id_name", "#id_source_id", "#id_default_source_type"].forEach((sel) => {
+    const el = form.querySelector(sel);
+    if (el) el.addEventListener("input", persistPathsToStore);
+  });
+  form.querySelectorAll(".file-select").forEach((el) => {
+    el.addEventListener("change", () => {
+      persistPathsToStore();
+      updateSummary();
+    });
+  });
+
+  form.addEventListener("submit", function (e) {
+    const submitter = e.submitter;
+    const action = submitter?.getAttribute("name") === "action" ? submitter.value : "create_job";
+
+    if (action !== "create_job") return;
+
+    const connRadio = form.querySelector('input[name="input_mode"][value="connector"]');
+    if (hasConnector && connRadio) connRadio.checked = true;
+
+    const paths = getSelectedPaths();
+    if (paths.length > maxFiles) {
+      e.preventDefault();
+      alert("Select at most " + maxFiles + " files.");
+      return;
+    }
+    if (!form.querySelector("#id_name")?.value?.trim()) {
+      e.preventDefault();
+      alert("Enter a job name.");
+      form.querySelector("#id_name")?.focus();
+      return;
+    }
+    if (!form.querySelector("#id_source_id")?.value?.trim()) {
+      e.preventDefault();
+      alert("Enter a feed key.");
+      form.querySelector("#id_source_id")?.focus();
+      return;
+    }
+    if (hasConnector && paths.length === 0) {
+      e.preventDefault();
+      alert("Select at least one file from the connector browse.");
+      return;
+    }
+    const holder = document.getElementById("remote-path-hidden");
+    holder.innerHTML = "";
+    form.querySelectorAll('input.file-select[name="remote_paths"]').forEach((el) => { el.removeAttribute("name"); });
+    paths.forEach((p) => {
+      const h = document.createElement("input");
+      h.type = "hidden";
+      h.name = "remote_paths";
+      h.value = p;
+      holder.appendChild(h);
+    });
+    persistPathsToStore();
+  });
+
+  if (!wizardFresh) {
+    const store = loadStore();
+    const initialPaths = Array.from(
+      new Set([...(Array.isArray(serverSelected) ? serverSelected : []), ...(store.paths || [])])
+    );
+    if (initialPaths.length) {
+      store.paths = initialPaths;
+      saveStore(store);
+    }
+    applyDraftToForm({
+      ...store,
+      name: form.querySelector("#id_name")?.value || store.name,
+      source_id: form.querySelector("#id_source_id")?.value || store.source_id,
+    });
+    syncCheckboxesFromStore();
+  } else {
+    updateSummary();
+  }
+  syncPanels();
+})();
+</script>
+{% endblock %}

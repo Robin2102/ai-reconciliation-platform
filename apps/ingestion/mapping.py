@@ -301,7 +301,14 @@ def _computed_txn_type(cr: Decimal, dr: Decimal) -> str:
     return "MIXED"
 
 
-def _attach_generated(payload: dict, timestamp: datetime, cr: Decimal, dr: Decimal, uploaded_at: datetime | None) -> dict:
+def _attach_generated(
+    payload: dict,
+    timestamp: datetime,
+    cr: Decimal,
+    dr: Decimal,
+    uploaded_at: datetime | None,
+    source_filename: str | None = None,
+) -> dict:
     out = dict(payload)
     uploaded = None
     if uploaded_at is not None:
@@ -314,6 +321,7 @@ def _attach_generated(payload: dict, timestamp: datetime, cr: Decimal, dr: Decim
         "txn_type": _computed_txn_type(cr, dr),
         "reconciled_date": None,
         "reconciled_by": None,
+        "source_filename": (source_filename or "").strip() or None,
     }
     return out
 
@@ -376,6 +384,7 @@ def apply_column_mapping(
     source_id: str,
     columns: list[ColumnMapping] | None = None,
     uploaded_at: datetime | None = None,
+    source_filename: str | None = None,
 ) -> CanonicalRecord:
     columns = columns if columns is not None else list(template.columns.all())
     by_role = _columns_by_role(columns)
@@ -400,7 +409,9 @@ def apply_column_mapping(
                 parts.append(text)
         description = REF_JOIN.join(parts) or None
 
-    payload = _attach_generated(apply_pii_to_payload(row, columns), timestamp, cr, dr, uploaded_at)
+    payload = _attach_generated(
+        apply_pii_to_payload(row, columns), timestamp, cr, dr, uploaded_at, source_filename
+    )
     return CanonicalRecord(
         source_id=source_id,
         external_ref=ref,

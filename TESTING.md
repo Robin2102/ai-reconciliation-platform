@@ -17,6 +17,7 @@ apps/<app>/tests/
 | `ingestion` | `test_api.py`, `test_ops.py`, `test_services.py`, `test_mapping.py` | REST ingest, `/ops/` staging + mapping, Kafka hook, profiler/mapping |
 | `reconciliation` | `test_engine_runs.py`, `test_engine_conditions.py`, `test_generated_fields.py` | Projects/runs, rule conditions, `_generated` fields |
 | `exceptions` | `test_workflow.py` | Status transitions, manual match, write-off, ops POST |
+| `connectors` | `test_local_driver.py`, `test_ops_connectors.py` | Local path driver, ops CRUD/test/browse |
 
 Name files by **behavior** (`test_engine_runs`), not roadmap phase (`test_recon_5a`).
 

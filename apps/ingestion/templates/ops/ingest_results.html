@@ -3,7 +3,7 @@
 {% block title %}Ingest results{% endblock %}
 
 {% block content %}
-<p class="steps">1. Upload → 2. Map columns → <b>3. Results</b></p>
+<p class="steps">Ingestion job → Map → <b>Results</b></p>
 <h1 class="page-title">Normalized transactions</h1>
 <p class="lede">
   {{ ingest_file.original_name }}
@@ -14,13 +14,17 @@
 </p>
 
 <div class="toolbar">
-  <a class="btn secondary" href="{% url 'ops-ingest' %}">Back to ingest</a>
-  <a class="btn ghost" href="{% url 'ops-mapping' ingest_file.pk %}">Mapping template</a>
+  {% if job_run %}
+  <a class="btn secondary" href="{% url 'ops-job-detail' job_run.job_id %}">Back to job</a>
+  <a class="btn ghost" href="{% url 'ops-job-mapping' job_run.job_id %}">Mapping</a>
+  {% else %}
+  <a class="btn secondary" href="{% url 'ops-jobs' %}">Back to jobs</a>
+  {% endif %}
 </div>
 
 {% if not rows %}
 <div class="card">
-  <p class="lede" style="margin:0">No transactions are linked to this upload yet. Re-run ingest after migrating, or check Django admin for rows with the same feed key.</p>
+  <p class="lede" style="margin:0">No transactions are linked to this ingest run yet. Re-run the ingestion job or check Django admin for rows with the same feed key.</p>
 </div>
 {% else %}
 <div class="card" style="padding:0">
@@ -29,6 +33,7 @@
       <thead>
         <tr>
           <th>Reference</th>
+          <th>Source file</th>
           <th>Transaction date</th>
           <th>CR</th>
           <th>DR</th>
@@ -44,6 +49,7 @@
         {% with tx=row.transaction %}
         <tr>
           <td><code>{{ tx.external_ref }}</code></td>
+          <td><code>{{ tx.source_filename|default:"—" }}</code></td>
           <td>{{ tx.timestamp|date:"Y-m-d H:i" }}</td>
           <td>{{ tx.cr_amount }}</td>
           <td>{{ tx.dr_amount }}</td>

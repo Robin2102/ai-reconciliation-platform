@@ -1,0 +1,62 @@
+{% extends "ops/base.html" %}
+{% block title %}{{ job.name }}{% endblock %}
+{% block content %}
+<p class="steps"><a href="{% url 'ops-jobs' %}">Ingestion jobs</a> → <b>{{ job.name }}</b></p>
+<h1 class="page-title">{{ job.name }}</h1>
+<p class="lede">
+  Feed <code>{{ job.source_id }}</code> · <span class="badge {{ job.status }}">{{ job.status }}</span>
+  · {{ job.inputs.count }} file(s) (max {{ max_files }})
+  {% if job.connector %}· connector <strong>{{ job.connector.name }}</strong>{% endif %}
+</p>
+
+{% if mapping_error %}
+<div class="flash flash-error">{{ mapping_error }}</div>
+{% endif %}
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Pipeline</h2>
+  <ol>
+    <li>Files listed below</li>
+    <li>Map columns from a sample file → saves a <code>MappingTemplate</code> for this feed key</li>
+    <li>Run job — merged extract, normalize, one Kafka <code>record.ingested</code></li>
+  </ol>
+  <div class="toolbar">
+    <a class="btn secondary" href="{% url 'ops-job-mapping' job.pk %}"{% if not has_files %} style="opacity:.5;pointer-events:none" title="Add files first"{% endif %}>Open mapping studio</a>
+    <form method="post" action="{% url 'ops-job-run' job.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button class="btn" type="submit"{% if not can_run %} disabled title="Complete mapping first"{% endif %}>Run ingestion job</button>
+    </form>
+  </div>
+  {% if mapping_ready %}
+  <p class="lede" style="margin-bottom:0;color:var(--accent-2)">Mapping template ready.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Input files</h2>
+  <ul>
+    {% for inp in job.inputs.all %}
+    <li><code>{{ inp.original_filename|default:inp.remote_path|default:inp.local_path }}</code></li>
+    {% empty %}
+    <li class="lede">No files — <a href="{% url 'ops-job-create' %}?fresh=1">create a new job</a> with uploads or connector browse.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% if latest_run %}
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Latest run #{{ latest_run.pk }}</h2>
+  <p><span class="badge {{ latest_run.status }}">{{ latest_run.status }}</span></p>
+  {% if latest_run.error_message %}<p class="errornote">{{ latest_run.error_message }}</p>{% endif %}
+  {% if latest_run.stats %}
+  <ul>
+    <li>Transactions: {{ latest_run.stats.transaction_count }}</li>
+    <li>Files OK: {{ latest_run.stats.files_ok }} / {{ latest_run.stats.files_total }}</li>
+  </ul>
+  {% endif %}
+  {% if latest_run.primary_ingest_file %}
+  <p><a href="{% url 'ops-ingest-results' latest_run.primary_ingest_file_id %}">View merged rows</a></p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

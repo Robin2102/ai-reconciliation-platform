@@ -36,6 +36,10 @@ GENERATED_COLUMNS = [
         "name": "reconciled_by",
         "meaning": "Null at ingest; System when auto-matched; Django username when an exception is manually closed.",
     },
+    {
+        "name": "source_filename",
+        "meaning": "Original file name when a job merges multiple files (not a source column).",
+    },
 ]
 
 ROLE_LABELS = {
@@ -112,6 +116,54 @@ def save_mapping_from_post(request, template: MappingTemplate, headers: list[str
         col.extra = {"trim": request.POST.get(f"col-{i}-trim") == "on"}
         col.save()
     return MappingTemplate.objects.prefetch_related("columns").get(pk=template.pk)
+
+
+def refresh_ingestion_job_profile(job) -> None:
+    """Re-fetch sample file and sync MappingTemplate columns from a new profile."""
+    from pathlib import Path
+
+    from apps.ingestion.job_inputs import refresh_job_profile_file
+    from apps.ingestion.services import profiler_source_type
+
+    filename = refresh_job_profile_file(job)
+    path = job.profile_local_path
+    effective_type = profiler_source_type(path, job.default_source_type)
+    profile = profile_staged_file(path, effective_type)
+    ingest_file = IngestFile(
+        path=path,
+        original_name=filename or Path(path).name,
+        source_type=effective_type,
+        source_id=job.source_id,
+    )
+    seed_or_load_template(ingest_file, profile)
+
+
+def mapping_page_context_for_job(job, highlight_transaction_date: bool = False) -> dict:
+    from pathlib import Path
+
+    from apps.ingestion.services import profiler_source_type
+
+    if not job.profile_local_path or not Path(job.profile_local_path).is_file():
+        raise ValueError("Profile file missing — add files to the job first.")
+    effective_type = profiler_source_type(job.profile_local_path, job.default_source_type)
+    profile = profile_staged_file(job.profile_local_path, effective_type)
+    template = MappingTemplate.objects.filter(source_id=job.source_id).order_by("-updated_at").first()
+    if template is None:
+        template = MappingTemplate.objects.create(
+            name=f"{job.source_id} mapping",
+            source_id=job.source_id,
+            default_currency="INR",
+        )
+    ingest_file = IngestFile(
+        path=job.profile_local_path,
+        original_name=Path(job.profile_local_path).name,
+        source_type=effective_type,
+        source_id=job.source_id,
+    )
+    ctx = mapping_page_context(ingest_file, highlight_transaction_date=highlight_transaction_date)
+    ctx["ingestion_job"] = job
+    ctx["template"] = template
+    return ctx
 
 
 def mapping_page_context(ingest_file: IngestFile, highlight_transaction_date: bool = False) -> dict:

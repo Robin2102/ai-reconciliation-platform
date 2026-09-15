@@ -1,0 +1,13 @@
+{% extends "ops/base.html" %}
+{% block title %}New source{% endblock %}
+{% block content %}
+<p class="steps"><a href="{% url 'ops-sources' %}">Sources</a> → <b>New</b></p>
+<h1 class="page-title">New source</h1>
+<form method="post" class="card" style="max-width:560px">
+  {% csrf_token %}
+  {% for field in form %}
+  <p><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</p>
+  {% endfor %}
+  <button class="btn" type="submit">Create</button>
+</form>
+{% endblock %}

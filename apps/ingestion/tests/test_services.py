@@ -11,6 +11,9 @@ class InferSourceTypeTests(TestCase):
     def test_txt_extension_defaults_to_txt_adapter(self):
         self.assertEqual(infer_source_type("ledger.txt", "csv"), "txt")
 
+    def test_out_extension_defaults_to_txt_adapter(self):
+        self.assertEqual(infer_source_type("16817377.20260501040325.out", "csv"), "txt")
+
     def test_csv_extension_stays_csv(self):
         self.assertEqual(infer_source_type("ledger.csv", "csv"), "csv")
 

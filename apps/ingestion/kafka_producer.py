@@ -1,7 +1,7 @@
 """
 Publish facts to Kafka after ingest commits.
 
-Celery: "run ingest_file_task". Kafka: "records were ingested" — recon, metrics,
+Celery: ingestion job run (merged ingest). Kafka: "records were ingested" — recon, metrics,
 or an AI service can subscribe without changing the Celery task.
 
 Payload is identifiers and counts, never the CSV or raw_payload (those live in

@@ -130,36 +130,22 @@ python manage.py consume_matched_events   # after a recon run publishes record.m
 
 Inspect topics at `http://localhost:8080`. The app talks to **one** bootstrap; running Confluent Local at the same time is a second cluster and is ignored unless you change that env var.
 
-## HTTP API
+## Ops ingest (staff UI)
 
-`POST /api/ingest/` — multipart upload.
+`/ops/` redirects to **Ingestion jobs** (`/ops/jobs/`). Flow:
 
-| Field | Required | Notes |
-| --- | --- | --- |
-| `file` | yes | CSV bytes |
-| `source_type` | no | `csv` (default) or `txt` |
-| `source_id` | no | Defaults to the filename stem |
+1. **Connectors** (`/ops/connectors/`) — local directory (SFTP/Postgres later).
+2. **Sources** (optional) — saved file lists; **Create ingestion job** copies inputs.
+3. **Job** — upload up to 5 files and/or pick connector paths → **Mapping** (profile or existing template) → **Run** (Celery merged ingest + Kafka after commit).
 
-```bash
-curl -sS -F "file=@./sample.csv" -F "source_type=csv" -F "source_id=hdfc-sep" \
-  http://127.0.0.1:8000/api/ingest/
-```
-
-**202** with `task_id`, `status: queued`, `source_type`, `source_id`. Rows are
-not in the database until the worker runs `ingest_source` with the CSV adapter
-heuristics (no mapping template). Unknown `source_type` or an empty file
-returns **400** and does not enqueue.
-
-Ops UI (`/ops/`) — staff login. Upload stages an `IngestFile`; mapping studio
-profiles columns. Save a template, then **Run ingest** (Celery + Kafka after
-commit). Set `PII_FERNET_KEY` in `.env` (see `env.example`).
+Set `PII_FERNET_KEY` in `.env` (see `env.example`). See [`../INGESTION_CONNECTORS_PLAN.md`](../INGESTION_CONNECTORS_PLAN.md).
 
 `GET /admin/` — Django admin (inspect RawRecord / Transaction / templates).  
 `GET /silk/` — request/SQL profiler when `django-silk` is installed and `DEBUG` is true.
 
 ## Data
 
-- **`IngestFile`** — staged upload before mapping/ingest.
+- **`IngestFile`** — one record per merged ingestion run (audit + recon leg pointer).
 - **`MappingTemplate` / `ColumnMapping`** — reusable column roles for a `source_id`.
 - **`RawRecord`** — row JSON (PII columns encrypted when tagged), `source_type`, `source_id`, ingest status.
 - **`Transaction`** — canonical credit/debit, signed `amount`, currency, `timestamp` (transaction datetime), `external_ref` (reference / match key from mapped **Reference** columns).

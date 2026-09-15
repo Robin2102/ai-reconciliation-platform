@@ -1,0 +1,26 @@
+{% extends "ops/base.html" %}
+{% block title %}Ingestion jobs{% endblock %}
+{% block content %}
+<h1 class="page-title">Ingestion jobs</h1>
+<p class="lede">Primary ingest path: connector or upload (≤{{ max_files }} files) → profile → run once (merged + <code>source_filename</code>).</p>
+<a class="btn" href="{% url 'ops-job-create' %}?fresh=1">New ingestion job</a>
+<div class="card" style="padding:0;margin-top:1rem">
+  <table class="data">
+    <thead><tr><th>Name</th><th>Feed</th><th>Status</th><th>Files</th><th>Last run</th><th></th></tr></thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr>
+        <td>{{ j.name }}</td>
+        <td><code>{{ j.source_id }}</code></td>
+        <td>{{ j.status }}</td>
+        <td>{{ j.inputs.count }}</td>
+        <td>{{ j.last_run_at|date:"Y-m-d H:i"|default:"—" }}</td>
+        <td><a href="{% url 'ops-job-detail' j.pk %}">Open</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6">No jobs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

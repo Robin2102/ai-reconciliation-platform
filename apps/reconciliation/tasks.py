@@ -1,4 +1,4 @@
-"""Celery: run reconciliation in a worker (same pattern as ingest_file_task)."""
+"""Celery: run reconciliation in a worker."""
 
 from __future__ import annotations
 

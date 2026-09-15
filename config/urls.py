@@ -5,7 +5,6 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("ops/", include("apps.ingestion.ops_urls")),
-    path("api/", include("apps.ingestion.urls")),
 ]
 
 if settings.DEBUG and "silk" in settings.INSTALLED_APPS:

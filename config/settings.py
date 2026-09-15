@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "apps.ingestion",
     "apps.reconciliation",
     "apps.exceptions",
+    "apps.connectors",
     "apps.ai_agent",
 ]
 
@@ -144,6 +145,16 @@ else:
     }
 
 INGEST_UPLOAD_DIR = Path(os.getenv("INGEST_UPLOAD_DIR", BASE_DIR / "uploads"))
+CONNECTOR_STAGING_ROOT = Path(os.getenv("CONNECTOR_STAGING_ROOT", INGEST_UPLOAD_DIR / "connector_fetch"))
+_CONNECTOR_LOCAL_ALLOWLIST_DEFAULT = [BASE_DIR / "uploads", BASE_DIR / "connector_data"]
+_CONNECTOR_LOCAL_ALLOWLIST_EXTRA = [
+    Path(p.strip()).expanduser()
+    for p in os.getenv("CONNECTOR_LOCAL_ALLOWLIST", "").split(",")
+    if p.strip()
+]
+CONNECTOR_LOCAL_ALLOWLIST = _CONNECTOR_LOCAL_ALLOWLIST_DEFAULT + _CONNECTOR_LOCAL_ALLOWLIST_EXTRA
+
+MAX_INGESTION_JOB_FILES = int(os.getenv("MAX_INGESTION_JOB_FILES", "5"))
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
@@ -175,5 +186,5 @@ TIME_ZONE = "UTC"
 
 STATIC_URL = "/static/"
 LOGIN_URL = "ops-login"
-LOGIN_REDIRECT_URL = "ops-ingest"
+LOGIN_REDIRECT_URL = "ops-connectors"
 LOGOUT_REDIRECT_URL = "ops-login"

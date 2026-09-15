@@ -1,0 +1,79 @@
+{% extends "ops/base.html" %}
+{% block title %}{{ source.name }}{% endblock %}
+{% block content %}
+<p class="steps"><a href="{% url 'ops-sources' %}">Sources</a> → <b>{{ source.name }}</b></p>
+<h1 class="page-title">{{ source.name }}</h1>
+<p class="lede">Feed key <code>{{ source.source_id }}</code> · {{ source.file_specs.count }} file(s)</p>
+
+<div class="row">
+  <div class="card" style="flex:1 1 320px">
+    <h2 style="margin-top:0;font-size:1rem;">Settings</h2>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="_save_source" value="1">
+      {% for field in form %}
+      <p><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</p>
+      {% endfor %}
+      <button class="btn secondary" type="submit">Save</button>
+    </form>
+  </div>
+  <div class="card" style="flex:1 1 320px">
+    <h2 style="margin-top:0;font-size:1rem;">Selected files</h2>
+    <ul>
+      {% for spec in specs %}
+      <li>
+        <code>{{ spec.remote_path }}</code>
+        <form method="post" action="{% url 'ops-source-remove-spec' source.pk spec.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button class="btn ghost" type="submit" style="padding:.2rem .4rem;font-size:11px">Remove</button>
+        </form>
+      </li>
+      {% empty %}
+      <li class="lede">No files — browse below and add.</li>
+      {% endfor %}
+    </ul>
+    <p><a href="{% url 'ops-job-from-source' source.pk %}">Create ingestion job</a> (merges all files on run)</p>
+  </div>
+</div>
+
+{% if source.connector %}
+<div class="card" style="padding:0">
+  <h2 style="padding:1rem 1.2rem 0;margin:0;font-size:1rem;">Browse connector — multi-select</h2>
+  {% if browse_error %}<p class="errornote" style="padding:1rem">{{ browse_error }}</p>{% endif %}
+  {% if browse %}
+  <p class="lede" style="padding:0 1.2rem">
+    <code>/{{ browse.path }}</code>
+    {% if browse.parent_path is not None %} · <a href="?path={{ browse.parent_path }}">Up</a>{% endif %}
+  </p>
+  <form method="post" action="{% url 'ops-source-add-files' source.pk %}">
+    {% csrf_token %}
+    <div class="scroll" style="max-height:45vh">
+      <table class="data">
+        <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
+        <tbody>
+          {% for e in browse.entries %}
+          <tr>
+            <td>
+              {% if e.entry_type == "file" %}
+              <input type="checkbox" name="remote_paths" value="{{ e.path }}">
+              {% endif %}
+            </td>
+            <td>
+              {% if e.entry_type == "dir" %}
+              <a href="?path={{ e.path }}">{{ e.name }}</a>
+              {% else %}{{ e.name }}{% endif %}
+            </td>
+            <td>{{ e.entry_type }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p style="padding:1rem"><button class="btn" type="submit">Add selected files to source</button></p>
+  </form>
+  {% endif %}
+</div>
+{% else %}
+<p class="lede">Attach a connector in settings to browse files.</p>
+{% endif %}
+{% endblock %}

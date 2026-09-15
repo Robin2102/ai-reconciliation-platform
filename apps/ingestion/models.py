@@ -47,6 +47,21 @@ class IngestFile(models.Model):
     source_id = models.CharField(max_length=100, db_index=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.STAGED)
     error_message = models.TextField(blank=True, default="")
+    source_definition = models.ForeignKey(
+        "connectors.SourceDefinition",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ingest_files",
+    )
+    job_run = models.ForeignKey(
+        "ingestion.IngestionJobRun",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ingest_files",
+    )
+    connector_fetch_path = models.CharField(max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -123,3 +138,110 @@ class ColumnMapping(models.Model):
 
     def __str__(self):
         return f"{self.source_header} → {self.role}"
+
+
+class IngestionJob(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        READY = "ready", "Ready to run"
+
+    name = models.CharField(max_length=200)
+    source_id = models.CharField(max_length=100, db_index=True, default="")
+    default_source_type = models.CharField(max_length=50, default="csv")
+    connector = models.ForeignKey(
+        "connectors.Connector",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ingestion_jobs",
+    )
+    source_definition = models.ForeignKey(
+        "connectors.SourceDefinition",
+        null=True,
+        blank=True,
+        related_name="ingestion_jobs",
+        on_delete=models.SET_NULL,
+    )
+    template = models.ForeignKey(
+        MappingTemplate,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ingestion_jobs",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    profile_local_path = models.CharField(max_length=500, blank=True, default="")
+    last_run_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-last_run_at", "name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class IngestionJobInput(models.Model):
+    """Up to MAX_INGESTION_JOB_FILES inputs per job (upload path or connector remote path)."""
+
+    job = models.ForeignKey(IngestionJob, related_name="inputs", on_delete=models.CASCADE)
+    order = models.PositiveIntegerField(default=0)
+    remote_path = models.CharField(max_length=500, blank=True, default="")
+    local_path = models.CharField(max_length=500, blank=True, default="")
+    original_filename = models.CharField(max_length=255, blank=True, default="")
+    enabled = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+
+class IngestionJobRun(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RUNNING = "running", "Running"
+        DONE = "done", "Done"
+        ERROR = "error", "Error"
+
+    job = models.ForeignKey(IngestionJob, related_name="runs", on_delete=models.CASCADE)
+    primary_ingest_file = models.ForeignKey(
+        IngestFile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="primary_job_run",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    stats = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-started_at", "-id"]
+
+
+class IngestionJobFile(models.Model):
+    class FetchStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        FETCHED = "fetched", "Fetched"
+        SKIPPED = "skipped", "Skipped"
+        ERROR = "error", "Error"
+
+    run = models.ForeignKey(IngestionJobRun, related_name="job_files", on_delete=models.CASCADE)
+    source_file_spec = models.ForeignKey(
+        "connectors.SourceFileSpec",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    ingest_file = models.ForeignKey(
+        IngestFile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="job_files",
+    )
+    remote_path = models.CharField(max_length=500)
+    fetch_status = models.CharField(
+        max_length=20, choices=FetchStatus.choices, default=FetchStatus.PENDING
+    )
+    error_message = models.TextField(blank=True, default="")
