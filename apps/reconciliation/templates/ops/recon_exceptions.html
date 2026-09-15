@@ -5,7 +5,27 @@
 {% block content %}
 <p class="steps"><a href="{% url 'ops-recon' %}">Reconciliation</a> → <a href="{% url 'ops-recon-detail' project.pk %}">{{ project.name }}</a> → <b>Exceptions</b></p>
 <h1 class="page-title">Exception queue</h1>
-<p class="lede">Rows that had no match after all rules ran. Phase 6 adds investigate / resolve workflow.</p>
+<p class="lede">{{ active_count }} need attention (open or investigating). Resolve via manual match, write-off, or reject.</p>
+
+<form method="get" class="toolbar card" style="margin-bottom:1rem">
+  <div>
+    <label for="id_status">Status</label>
+    <select name="status" id="id_status">
+      {% for value, label in filter_form.fields.status.choices %}
+      <option value="{{ value }}"{% if filter_form.data.status == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="id_side">Side</label>
+    <select name="side" id="id_side">
+      {% for value, label in filter_form.fields.side.choices %}
+      <option value="{{ value }}"{% if filter_form.data.side == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn secondary" type="submit">Filter</button>
+</form>
 
 <div class="card" style="padding:0">
   <div class="scroll" style="max-height:70vh">
@@ -19,6 +39,7 @@
           <th>Reason</th>
           <th>Status</th>
           <th>Run</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -31,9 +52,10 @@
           <td>{{ ex.reason }}</td>
           <td><span class="badge {{ ex.status }}">{{ ex.status }}</span></td>
           <td>#{{ ex.run_id }}</td>
+          <td><a href="{% url 'ops-recon-exception-detail' project.pk ex.pk %}">Open</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7">No exceptions for this project.</td></tr>
+        <tr><td colspan="8">No exceptions match this filter.</td></tr>
         {% endfor %}
       </tbody>
     </table>

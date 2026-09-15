@@ -1,0 +1,84 @@
+{% extends "ops/base.html" %}
+
+{% block title %}Exception #{{ record.pk }}{% endblock %}
+
+{% block content %}
+<p class="steps">
+  <a href="{% url 'ops-recon' %}">Reconciliation</a> →
+  <a href="{% url 'ops-recon-detail' project.pk %}">{{ project.name }}</a> →
+  <a href="{% url 'ops-recon-exceptions' project.pk %}">Exceptions</a> →
+  <b>#{{ record.pk }}</b>
+</p>
+<h1 class="page-title">Exception #{{ record.pk }}</h1>
+<p class="lede">
+  <span class="badge {{ record.status }}">{{ record.status }}</span>
+  · {{ record.side }} leg · run #{{ record.run_id }}
+</p>
+
+<div class="row">
+  <div class="card" style="flex:1 1 280px">
+    <h2 style="margin-top:0;font-size:1rem;">Transaction</h2>
+    <p>
+      <code>{{ record.transaction.external_ref }}</code><br>
+      {{ record.transaction.amount }} {{ record.transaction.currency }}<br>
+      {{ record.transaction.timestamp|date:"Y-m-d H:i" }}<br>
+      {{ record.reason }}
+    </p>
+  </div>
+  {% if record.status == "resolved" or record.status == "rejected" %}
+  <div class="card" style="flex:1 1 280px">
+    <h2 style="margin-top:0;font-size:1rem;">Resolution</h2>
+    <p>
+      {% if record.resolution_kind %}<b>{{ record.get_resolution_kind_display }}</b><br>{% endif %}
+      {% if record.resolved_by %}By {{ record.resolved_by.username }}{% if record.resolved_at %} · {{ record.resolved_at|date:"Y-m-d H:i" }}{% endif %}<br>{% endif %}
+      {% if record.paired_transaction %}Paired with <code>{{ record.paired_transaction.external_ref }}</code><br>{% endif %}
+      {{ record.resolution_note|default:"—" }}
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% if record.status == "open" or record.status == "investigating" %}
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Actions</h2>
+  {% if record.status == "open" %}
+  <form method="post" action="{% url 'ops-recon-exception-action' project.pk record.pk %}" style="margin-bottom:1rem">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="investigate">
+    <button class="btn secondary" type="submit">Start investigating</button>
+  </form>
+  {% endif %}
+
+  <form method="post" action="{% url 'ops-recon-exception-action' project.pk record.pk %}" class="card" style="background:var(--panel-2);margin-bottom:1rem">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="manual_match">
+    <h3 style="margin:0 0 .5rem;font-size:.95rem;">Manual match (opposite leg)</h3>
+    <p class="lede" style="margin-top:0;font-size:12px">Creates a match result and marks both rows reconciled. Closes the paired exception if present.</p>
+    <label for="id_counterparty_id">Counterparty row</label>
+    {{ manual_form.counterparty_id }}
+    <label for="id_note_mm" style="margin-top:.5rem">Note</label>
+    <textarea name="note" id="id_note_mm" rows="2" style="width:100%"></textarea>
+    <div class="actions"><button class="btn" type="submit">Save manual match</button></div>
+  </form>
+
+  <form method="post" action="{% url 'ops-recon-exception-action' project.pk record.pk %}" class="card" style="background:var(--panel-2);margin-bottom:1rem">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="write_off">
+    <h3 style="margin:0 0 .5rem;font-size:.95rem;">Write-off</h3>
+    <label for="id_note_wo">Reason (required)</label>
+    <textarea name="note" id="id_note_wo" rows="2" style="width:100%" required></textarea>
+    <div class="actions"><button class="btn secondary" type="submit">Write off</button></div>
+  </form>
+
+  <form method="post" action="{% url 'ops-recon-exception-action' project.pk record.pk %}" class="card" style="background:var(--panel-2)">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="reject">
+    <h3 style="margin:0 0 .5rem;font-size:.95rem;">Reject</h3>
+    <p class="lede" style="margin-top:0;font-size:12px">Close without changing reconciliation fields on the transaction.</p>
+    <label for="id_note_rej">Note</label>
+    <textarea name="note" id="id_note_rej" rows="2" style="width:100%"></textarea>
+    <div class="actions"><button class="btn ghost" type="submit">Reject</button></div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

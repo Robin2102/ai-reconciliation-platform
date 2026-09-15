@@ -10,6 +10,12 @@ class ExceptionRecord(models.Model):
         OPEN = "open", "Open"
         INVESTIGATING = "investigating", "Investigating"
         RESOLVED = "resolved", "Resolved"
+        REJECTED = "rejected", "Rejected"
+
+    class ResolutionKind(models.TextChoices):
+        MANUAL_MATCH = "manual_match", "Manual match"
+        WRITE_OFF = "write_off", "Write-off"
+        REJECTED = "rejected", "Rejected"
 
     class Side(models.TextChoices):
         SOURCE = "source", "Source"
@@ -33,7 +39,25 @@ class ExceptionRecord(models.Model):
     side = models.CharField(max_length=10, choices=Side.choices)
     reason = models.CharField(max_length=200, default="unmatched")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    resolution_kind = models.CharField(
+        max_length=30, choices=ResolutionKind.choices, blank=True, default=""
+    )
     resolution_note = models.TextField(blank=True, default="")
+    resolved_by = models.ForeignKey(
+        "auth.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="resolved_exceptions",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    paired_transaction = models.ForeignKey(
+        "reconciliation.Transaction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="exception_manual_pairs",
+    )
     ai_suggestion = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

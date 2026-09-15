@@ -89,7 +89,9 @@ def recon_detail(request, project_id: int):
             "match_results_truncated": match_results_truncated,
             "rules": project.rules.all(),
             "rule_templates": RULE_TEMPLATES,
-            "open_exceptions": project.exceptions.filter(status=ExceptionRecord.Status.OPEN).count(),
+            "open_exceptions": project.exceptions.filter(
+                status__in=[ExceptionRecord.Status.OPEN, ExceptionRecord.Status.INVESTIGATING]
+            ).count(),
         },
     )
 
@@ -113,21 +115,6 @@ def recon_add_rule(request, project_id: int):
     )
     messages.success(request, f"Rule “{form.cleaned_data['name']}” added.")
     return redirect("ops-recon-detail", project_id=project_id)
-
-
-@staff_member_required(login_url="ops-login")
-def recon_exceptions(request, project_id: int):
-    project = get_object_or_404(ReconProject, pk=project_id)
-    records = (
-        ExceptionRecord.objects.filter(project=project)
-        .select_related("transaction", "run")
-        .order_by("-created_at")[:500]
-    )
-    return render(
-        request,
-        "ops/recon_exceptions.html",
-        {"project": project, "records": records},
-    )
 
 
 @staff_member_required(login_url="ops-login")
