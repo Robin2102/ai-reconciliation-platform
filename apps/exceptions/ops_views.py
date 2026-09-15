@@ -91,6 +91,19 @@ def exception_detail(request, project_id: int, exception_id: int):
     manual_form.fields["counterparty_id"].widget = forms.Select(
         choices=[("", "— select row —")] + _counterparty_choices(project, record)
     )
+    similar_cases = []
+    try:
+        from apps.ai_agent.rag.indexing import exception_query_text
+        from apps.ai_agent.tools.tools import retrieve_similar_past_cases
+
+        similar_cases = retrieve_similar_past_cases(
+            exception_query_text(record),
+            k=5,
+            exclude_exception_id=record.pk,
+            project_id=project.pk,
+        )
+    except Exception:
+        similar_cases = []
     return render(
         request,
         "ops/recon_exception_detail.html",
@@ -100,6 +113,7 @@ def exception_detail(request, project_id: int, exception_id: int):
             "manual_form": manual_form,
             "write_off_form": ResolveWriteOffForm(),
             "reject_form": RejectForm(),
+            "similar_cases": similar_cases,
         },
     )
 

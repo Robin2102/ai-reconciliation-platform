@@ -169,6 +169,13 @@ if RUNNING_TESTS:
     CELERY_TASK_ALWAYS_EAGER = True
     KAFKA_ENABLED = False
 
+# RAG (Phase 7): fake = deterministic local vectors; sentence_transformers = local ML model
+RAG_EMBEDDING_BACKEND = os.getenv("RAG_EMBEDDING_BACKEND", "fake")
+RAG_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+RAG_EMBEDDING_DIM = int(os.getenv("RAG_EMBEDDING_DIM", "384"))
+if RUNNING_TESTS:
+    RAG_EMBEDDING_BACKEND = "fake"
+
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",

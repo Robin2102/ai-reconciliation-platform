@@ -55,7 +55,17 @@ def reject_exception(record: ExceptionRecord, user: AbstractUser, note: str = ""
             "updated_at",
         ]
     )
+    _index_for_rag(record)
     return record
+
+
+def _index_for_rag(record: ExceptionRecord) -> None:
+    try:
+        from apps.ai_agent.rag.indexing import index_exception_record
+
+        index_exception_record(record)
+    except Exception:
+        pass
 
 
 def resolve_write_off(record: ExceptionRecord, user: AbstractUser, note: str = "") -> ExceptionRecord:
@@ -84,6 +94,7 @@ def resolve_write_off(record: ExceptionRecord, user: AbstractUser, note: str = "
             "updated_at",
         ]
     )
+    _index_for_rag(record)
     return record
 
 
@@ -172,3 +183,4 @@ def _mark_resolved(
             "updated_at",
         ]
     )
+    _index_for_rag(record)

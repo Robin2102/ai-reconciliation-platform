@@ -38,6 +38,24 @@
   {% endif %}
 </div>
 
+<div class="card">
+  <h2 style="margin-top:0;font-size:1rem;">Similar past cases (RAG)</h2>
+  {% if similar_cases %}
+  <p class="lede" style="font-size:12px">Retrieved from resolved/rejected exceptions in this project. Index with <code>python manage.py index_exception_knowledge</code> after bulk imports.</p>
+  <ul style="margin:0;padding-left:1.2rem">
+    {% for hit in similar_cases %}
+    <li style="margin-bottom:.75rem">
+      <strong>score {{ hit.score|floatformat:2 }}</strong>
+      {% if hit.exception_id %}· exception #{{ hit.exception_id }}{% endif %}
+      <pre class="job-error" style="margin-top:.35rem;white-space:pre-wrap;font-size:11px">{{ hit.text }}</pre>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="lede" style="margin:0">No similar chunks yet. Resolve a few exceptions with notes, or run <code>python manage.py index_exception_knowledge</code>.</p>
+  {% endif %}
+</div>
+
 {% if record.status == "open" or record.status == "investigating" %}
 <div class="card">
   <h2 style="margin-top:0;font-size:1rem;">Actions</h2>
